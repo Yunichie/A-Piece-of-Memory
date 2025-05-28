@@ -9,7 +9,7 @@ namespace APieceOfMemory
         public PointF Position { get; set; }
         public Size Size { get; private set; }
         public Color Color { get; set; }
-        public float Speed { get; set; } // This is correct (public set)
+        public float Speed { get; set; }
         public EnemyType Type { get; private set; }
         public int Health { get; set; }
 
@@ -45,20 +45,15 @@ namespace APieceOfMemory
                     break;
                 default:
                     Size = new Size(baseSize, baseSize);
-                    Color = Color.Gray; // Default color if type is unexpected
+                    Color = Color.Gray;
                     baseSpeedMagnitude = 1.0f;
                     break;
             }
-            // Initialize Speed with its positive magnitude.
-            // GameForm.cs will set the correct sign for direction.
             this.Speed = baseSpeedMagnitude;
         }
 
-        public void Update(PointF targetPosition) // targetPosition can be used for more advanced movement later
+        public void Update(PointF targetPosition)
         {
-            // CORRECTED LINE:
-            // The Speed property now correctly includes its direction (+ for right, - for left),
-            // which was set by GameForm.cs. So, we just add it to the current X position.
             Position = new PointF(Position.X + this.Speed, Position.Y); 
         }
 

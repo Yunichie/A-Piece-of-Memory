@@ -1,8 +1,9 @@
-﻿using System.Drawing;
+﻿// Projectile.cs
+using System.Drawing;
 
 namespace APieceOfMemory
 {
-    public enum ProjectileType { Player, Enemy }
+    public enum ProjectileType { Player, Enemy } // Assuming this is already defined
 
     public class Projectile
     {
@@ -26,9 +27,18 @@ namespace APieceOfMemory
             Type = type;
         }
 
-        public void Update()
+        // MODIFIED Update method
+        public bool Update(Rectangle clientBounds)
         {
             Position = new PointF(Position.X + Velocity.X, Position.Y + Velocity.Y);
+
+            // Check if projectile is off-screen
+            if (Position.X < -Size.Width || Position.X > clientBounds.Width ||
+                Position.Y < -Size.Height || Position.Y > clientBounds.Height)
+            {
+                return false; // Should be removed
+            }
+            return true; // Still active
         }
 
         public void Draw(Graphics g)
@@ -38,7 +48,7 @@ namespace APieceOfMemory
             // } else {
             using (SolidBrush brush = new SolidBrush(Color))
             {
-                g.FillEllipse(brush, Bounds); // Projectiles as small circles
+                g.FillEllipse(brush, Bounds); 
             }
             // }
         }

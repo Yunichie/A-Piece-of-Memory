@@ -18,11 +18,11 @@ namespace APieceOfMemory
         public Color Color { get; private set; }
         public RectangleF Bounds => new RectangleF(Position, Size);
 
-        public bool IsExpired { get; private set; } // To mark for removal by GameForm
+        public bool IsExpired { get; private set; }
         private DateTime creationTime;
-        private static readonly TimeSpan Lifespan = TimeSpan.FromSeconds(7); // Collectibles last for 7 seconds
+        private static readonly TimeSpan Lifespan = TimeSpan.FromSeconds(7);
 
-        public static readonly int DefaultSize = 18; // Made static const for easier access
+        public static readonly int DefaultSize = 18;
 
         // Sprite placeholder:
         // public Image WaterSprite { get; set; }
@@ -53,20 +53,17 @@ namespace APieceOfMemory
             {
                 IsExpired = true;
             }
-            // Optional: Add slight bobbing, fading animation, or slow fall here
-            // Example: Position = new PointF(Position.X, Position.Y + 0.3f); // Gentle fall
         }
 
         public void Draw(Graphics g)
         {
-            // Optional: Could reduce alpha as it nears expiry for a fading effect
             // float remainingLifeRatio = 1f - (float)((DateTime.Now - creationTime).TotalSeconds / Lifespan.TotalSeconds);
             // if (remainingLifeRatio < 0) remainingLifeRatio = 0;
             // int alpha = IsExpired ? 0 : (int)(255 * Math.Pow(remainingLifeRatio, 0.5)); // Apply a curve for better fade
             // alpha = Math.Max(0, Math.Min(255, alpha));
 
             // using (SolidBrush brush = new SolidBrush(Color.FromArgb(alpha, this.Color)))
-            using (SolidBrush brush = new SolidBrush(this.Color)) // Simple draw for now
+            using (SolidBrush brush = new SolidBrush(this.Color))
             {
                 if (Type == CollectibleType.Water)
                 {

@@ -8,7 +8,7 @@ namespace APieceOfMemory
         public Size Size { get; private set; }
         public Color Color { get; set; }
         public int Speed { get; set; }
-        public bool CanMoveFreely { get; set; } // True for levels 1 and 6
+        public bool CanMoveFreely { get; set; }
 
         public RectangleF Bounds => new RectangleF(Position, Size);
 

@@ -1,66 +1,82 @@
-﻿using System;
+﻿// GameForm.cs
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D; // For SmoothingMode
 using System.Linq;
 using System.Windows.Forms;
+using System.Diagnostics;     // For Debug.WriteLine
+
+// Ensure GameScreenState enum is defined (e.g., at the top of this file or in a shared file)
+public enum GameScreenState { Playing, LevelTransition, GameOver }
+// (StartScreen state is handled by the separate StartScreen.cs)
 
 namespace APieceOfMemory
 {
     public partial class GameForm : Form
     {
-        // ... (Existing fields from the previous correct version)
+        private GameScreenState currentScreenState = GameScreenState.Playing; // GameForm starts directly into Playing
+
+        // Core Game Objects
         private Player player;
         private Flower flower;
         private List<Enemy> enemies;
         private Boss boss;
         private List<Projectile> playerProjectiles;
         private List<Projectile> enemyProjectiles;
+        private List<Collectible> activeCollectibles;
+
+        // Level and Game State
         private int currentLevel = 1;
         private System.Windows.Forms.Timer gameTimer;
         private Random random = new Random();
         private HashSet<Keys> pressedKeys = new HashSet<Keys>();
+        private string gameMessage = ""; // For "Level Complete", "Game Over" overlays
+
+        // Game Parameters
         private const int PlayerSize = 30;
         private const int FlowerPotSize = 60;
         private const int EnemyBaseSize = 28;
         private const int BossSize = 70;
-        private const int ProjectileSize = 8; // Keep this, it's projectile visual size
+        private const int ProjectileSize = 8;
         private const int PlayerSpeed = 5;
-        private const float PlayerProjectileSpeed = 10f; // Speed of the projectile
+        private const float PlayerProjectileSpeed = 10f;
         private const float EnemyProjectileSpeed = 6f;
+
+        // Cooldowns and Timers
         private DateTime lastPlayerShootTime = DateTime.MinValue;
-        private TimeSpan playerShootCooldown = TimeSpan.FromMilliseconds(300); // Adjusted cooldown slightly
+        private TimeSpan playerShootCooldown = TimeSpan.FromMilliseconds(300);
         private DateTime lastBossShootTime = DateTime.MinValue;
-        private TimeSpan bossShootCooldown = TimeSpan.FromSeconds(1.2);
+        private TimeSpan bossShootCooldown = TimeSpan.FromSeconds(1.0); // Slightly faster regular boss shots
         private DateTime lastEnemySpawnTime = DateTime.MinValue;
         private TimeSpan enemySpawnInterval;
-        private bool gameOver = false;
-        private bool levelComplete = false;
-        private string gameMessage = "";
+        private DateTime lastPlayerCareActionTime = DateTime.MinValue;
+        private TimeSpan playerCareActionCooldown = TimeSpan.FromMilliseconds(700);
+        
+        // Boss Special Attack Fields
+        private DateTime lastBossSpecialAttackTime = DateTime.MinValue;
+        private TimeSpan bossSpecialAttackInterval = TimeSpan.FromSeconds(10); 
+        private TimeSpan bossSpecialAttackDuration = TimeSpan.FromSeconds(3.5); 
+        private DateTime bossSpecialAttackEndTime = DateTime.MinValue;
+        private bool isBossPerformingSpecialAttack = false;
+
+        // UI and Feedback
         private Font gameFont = new Font("Segoe UI", 12F, FontStyle.Bold);
-        private Font titleFont = new Font("Arial", 24F, FontStyle.Bold | FontStyle.Italic);
+        private Font titleFont = new Font("Georgia", 36F, FontStyle.Bold | FontStyle.Italic); // Matched StartScreen Title Font
         private Font smallFont = new Font("Segoe UI", 9F);
         private Font objectiveFont = new Font("Segoe UI", 10F, FontStyle.Italic);
-        private List<Collectible> activeCollectibles;
+        private string temporaryFeedbackMessage = "";
+        private DateTime feedbackMessageExpiry = DateTime.MinValue;
+
+        // Level Progress
         private int waterGoal;
         private int fertilizerGoal;
         private int waterProgress;
         private int fertilizerProgress;
-        private const float COLLECTIBLE_DROP_CHANCE = 2f;
-        private DateTime lastPlayerCareActionTime = DateTime.MinValue;
-        private TimeSpan playerCareActionCooldown = TimeSpan.FromMilliseconds(700);
-        private string temporaryFeedbackMessage = "";
-        private DateTime feedbackMessageExpiry = DateTime.MinValue;
-        // Add these fields to GameForm class
-        private DateTime lastBossSpecialAttackTime = DateTime.MinValue;
-        private TimeSpan bossSpecialAttackInterval = TimeSpan.FromSeconds(12); // How often special attack can occur
-        private TimeSpan bossSpecialAttackDuration = TimeSpan.FromSeconds(2.5); // How long the barrage lasts
-        private DateTime bossSpecialAttackEndTime = DateTime.MinValue;
-        private bool isBossPerformingSpecialAttack = false;
-        private int specialAttackProjectilesPerTick = 0; // Counter for projectiles in current special attack tick
+        private const float COLLECTIBLE_DROP_CHANCE = 0.40f; // 40% chance
 
-        // DEBUG
-        public float inflation = 25.0f;
+        // Debug (can be removed or adjusted for release)
+        public float inflation = 25f; // Moderate inflation for collection zone
 
         public GameForm()
         {
@@ -69,850 +85,489 @@ namespace APieceOfMemory
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(20, 20, 40);
+            this.BackColor = Color.FromArgb(15, 15, 30); // Darker blue
             this.DoubleBuffered = true;
 
             this.Paint += GameForm_Paint;
             this.KeyDown += GameForm_KeyDown;
             this.KeyUp += GameForm_KeyUp;
-            this.MouseClick += GameForm_MouseClick; // ADDED: Mouse click event handler
+            this.MouseClick += GameForm_MouseClick;
+            this.FormClosed += GameForm_FormClosed;
 
-            InitializeGame();
+            InitializeAndStartGame();
         }
 
-        private void InitializeGame()
+        private void InitializeAndStartGame() 
         {
-            gameOver = false;
-            levelComplete = false;
-            gameMessage = "";
-            temporaryFeedbackMessage = "";
-            pressedKeys.Clear();
-
-            // Initial player position (will be overridden by SetupLevel if needed)
-            player = new Player(this.ClientSize.Width / 2f - PlayerSize / 2f, this.ClientSize.Height - PlayerSize - 50, PlayerSize, Color.Cyan, PlayerSpeed);
-            flower = new Flower(30, this.ClientSize.Height / 2f - FlowerPotSize / 2f, FlowerPotSize);
-
-            enemies = new List<Enemy>();
-            playerProjectiles = new List<Projectile>();
-            enemyProjectiles = new List<Projectile>();
-            activeCollectibles = new List<Collectible>();
-            boss = null;
-
-            SetupLevel(currentLevel);
+            currentScreenState = GameScreenState.Playing;
+            currentLevel = 1;    
+            
+            StartGameplayLevel(currentLevel); 
 
             if (gameTimer == null)
             {
                 gameTimer = new System.Windows.Forms.Timer();
-                gameTimer.Interval = 16; // Approx 60 FPS
+                gameTimer.Interval = 16; 
                 gameTimer.Tick += GameTimer_Tick;
             }
-            gameTimer.Start();
+            if (!gameTimer.Enabled)
+            {
+                gameTimer.Start(); 
+            }
+        }
+        
+        private void StartGameplayLevel(int levelNumber)
+        {
+            currentLevel = levelNumber;
+            currentScreenState = GameScreenState.Playing;
+
+            player = new Player(this.ClientSize.Width / 2f - PlayerSize / 2f, this.ClientSize.Height - PlayerSize - 50, PlayerSize, Color.Cyan, PlayerSpeed);
+            flower = new Flower(30, this.ClientSize.Height / 2f - FlowerPotSize / 2f, FlowerPotSize); // Flower resets each level start
+            
+            enemies = new List<Enemy>();
+            playerProjectiles = new List<Projectile>();
+            enemyProjectiles = new List<Projectile>();
+            activeCollectibles = new List<Collectible>();
+            boss = null; 
+
+            waterProgress = 0;
+            fertilizerProgress = 0;
+            temporaryFeedbackMessage = "";
+            isBossPerformingSpecialAttack = false; 
+            lastBossSpecialAttackTime = DateTime.Now; 
+            pressedKeys.Clear();
+
+            SetupLevelSpecifics(currentLevel); 
+        }
+
+        private void SetupLevelSpecifics(int level)
+        {
+            player.CanMoveFreely = (level == 1 || level == 6 || level == 5);
+            if (level >= 2 && level <= 4) { 
+                player.CanMoveFreely = false;
+                player.Position = new PointF(flower.Bounds.Right + 15, flower.Bounds.Top + flower.Size.Height / 2f - player.Size.Height / 2f);
+            } else if (level == 5) { 
+                 player.CanMoveFreely = true; 
+                 player.Position = new PointF(this.ClientSize.Width * 0.2f, this.ClientSize.Height - PlayerSize - 50);
+            }
+            else { 
+                player.Position = new PointF(this.ClientSize.Width / 2f - PlayerSize / 2f, this.ClientSize.Height - PlayerSize - 50);
+            }
+
+            this.Text = $"A Piece of Memory - Level {level}";
+            gameMessage = "";
+            
+            switch (level)
+            {
+                case 1:
+                    waterGoal = 7; fertilizerGoal = 5;
+                    flower.State = FlowerState.Healthy; 
+                    enemySpawnInterval = TimeSpan.FromSeconds(9999);
+                    lastEnemySpawnTime = DateTime.Now;
+                    break;
+                case 2: case 3: case 4:
+                    if (level == 2) { waterGoal = 5; fertilizerGoal = 3; enemySpawnInterval = TimeSpan.FromSeconds(1.5); } 
+                    if (level == 3) { waterGoal = 8; fertilizerGoal = 5; enemySpawnInterval = TimeSpan.FromSeconds(1.0); }
+                    if (level == 4) { waterGoal = 12; fertilizerGoal = 8; enemySpawnInterval = TimeSpan.FromSeconds(0.7); } // Faster
+                    SpawnInitialEnemiesForLevel(level); 
+                    lastEnemySpawnTime = DateTime.Now.AddSeconds(-enemySpawnInterval.TotalSeconds + 0.5);
+                    break;
+                case 5:
+                    waterGoal = 0; fertilizerGoal = 0;
+                    enemySpawnInterval = TimeSpan.FromSeconds(9999);
+                    boss = new Boss( this.ClientSize.Width + BossSize + 20, this.ClientSize.Height / 2f - BossSize / 2f, BossSize, // Spawn further off
+                        Color.DarkMagenta, 1.2f, 80, this.ClientSize.Width, this.ClientSize.Height );
+                    lastEnemySpawnTime = DateTime.Now;
+                    lastBossSpecialAttackTime = DateTime.Now.AddSeconds(-bossSpecialAttackInterval.TotalSeconds + 5);
+                    isBossPerformingSpecialAttack = false;
+                    break;
+                case 6:
+                    waterGoal = 0; fertilizerGoal = 0;
+                    flower.State = FlowerState.Broken; 
+                    enemySpawnInterval = TimeSpan.FromSeconds(1.5); 
+                    if (!enemies.Any()) SpawnInitialEnemiesForLevel(6); 
+                    lastEnemySpawnTime = DateTime.Now.AddSeconds(-enemySpawnInterval.TotalSeconds + 1.0);
+                    break;
+                default: 
+                    HandleGameOver($"You've pieced together all the memories.\nThanks for playing!");
+                    break;
+            }
         }
 
         private void SpawnInitialEnemiesForLevel(int gameLevel)
         {
-            int count = 0;
-            EnemyType type = EnemyType.Slow;
-            float initialSpawnDelayFactor = 0; // For staggering initial spawns slightly if needed
+            int count = 0; EnemyType type = EnemyType.Slow;
+            if (gameLevel == 2) { count = 3; type = EnemyType.Slow; }
+            else if (gameLevel == 3) { count = 3; type = EnemyType.Fast; } 
+            else if (gameLevel == 4) { count = 4; type = EnemyType.Faster; }
+            else if (gameLevel == 6) { count = 4; type = EnemyType.Slow;}
 
-            if (gameLevel == 2) { count = 2; type = EnemyType.Slow; } // Spawn 2 slow enemies for level 2
-            else if (gameLevel == 3) { count = 2; type = EnemyType.Fast; initialSpawnDelayFactor = 0.5f; } // Spawn 2 fast
-            else if (gameLevel == 4) { count = 3; type = EnemyType.Faster; initialSpawnDelayFactor = 0.3f; } // Spawn 3 faster
-
-            for (int i = 0; i < count; i++)
-            {
-                float spawnY = player.Position.Y + random.Next(-player.Size.Height, player.Size.Height); // Spawn around player's Y for L2-4
+            for (int i = 0; i < count; i++) {
+                float spawnY;
+                 if (gameLevel >= 2 && gameLevel <= 4 && player != null) 
+                    spawnY = player.Position.Y + random.Next(-(int)(player.Size.Height*1.5), (int)(player.Size.Height*1.5));
+                 else 
+                    spawnY = random.Next(EnemyBaseSize, (int)(this.ClientSize.Height * 0.85f));
                 spawnY = Math.Max(EnemyBaseSize, Math.Min(this.ClientSize.Height - EnemyBaseSize * 2, spawnY));
-                
-                // ALWAYS SPAWN FROM THE RIGHT for levels 2, 3, 4 (and 6 if using this for initial right-only spawn)
-                float spawnX = this.ClientSize.Width + 20 + (i * (EnemyBaseSize + 30)); // Staggered off-screen right
-
+                float spawnX = this.ClientSize.Width + 30 + (i * (EnemyBaseSize + 35));
                 Enemy newEnemy = new Enemy(spawnX, spawnY, EnemyBaseSize, type);
-                
-                // Since they always spawn from the right (spawnX > player.Position.X is true),
-                // their speed should always be negative to move left.
                 newEnemy.Speed = -Math.Abs(newEnemy.Speed); 
-                
                 enemies.Add(newEnemy);
-                // System.Diagnostics.Debug.WriteLine($"L{gameLevel} SPAWN_INIT: Added enemy {i}. Pos:({newEnemy.Position.X},{newEnemy.Position.Y}), Speed:{newEnemy.Speed}. Total enemies: {enemies.Count}");
             }
         }
-
-
-        // In GameForm.cs
-        private void SetupLevel(int level)
-        {
-            // ... (existing clear lists, player setup) ...
-            enemies.Clear();
-            playerProjectiles.Clear();
-            enemyProjectiles.Clear();
-            activeCollectibles.Clear();
-            boss = null;
-
-            player.CanMoveFreely = (level == 1 || level == 6 || level == 5);
-            player.Position = new PointF(this.ClientSize.Width / 2f - PlayerSize / 2f, this.ClientSize.Height - PlayerSize - 50);
-
-            this.Text = $"A Piece of Memory - Level {level}";
-            
-            waterProgress = 0;
-            fertilizerProgress = 0;
-            temporaryFeedbackMessage = ""; 
-
-            switch (level)
-            {
-                case 1:
-                    waterGoal = 7;
-                    fertilizerGoal = 5;
-                    gameMessage = "Level 1: Nurture the flower. Stand near it and press 'E' to Water, 'R' to Fertilize.";
-                    flower.State = FlowerState.Healthy;
-                    enemySpawnInterval = TimeSpan.FromSeconds(9999); // No timed spawns
-                    lastEnemySpawnTime = DateTime.Now;
-                    break;
-                case 2:
-                case 3:
-                case 4:
-                    player.CanMoveFreely = false;
-                    player.Position = new PointF(flower.Bounds.Right + 15, flower.Bounds.Top + flower.Size.Height / 2f - player.Size.Height / 2f);
-                    
-                    // FASTER SPAWN INTERVALS:
-                    if (level == 2) { waterGoal = 5; fertilizerGoal = 3; enemySpawnInterval = TimeSpan.FromSeconds(0.5); gameMessage = "Level 2: Protect the flower! Click to shoot. Collect Water & Fertilizer."; } 
-                    if (level == 3) { waterGoal = 8; fertilizerGoal = 5; enemySpawnInterval = TimeSpan.FromSeconds(0.3); gameMessage = "Level 3: They are getting faster! Click to shoot. Gather more resources."; }
-                    if (level == 4) { waterGoal = 12; fertilizerGoal = 8; enemySpawnInterval = TimeSpan.FromSeconds(0.1); gameMessage = "Level 4: Overwhelm! Click to shoot. Stock up on essentials."; }
-                    
-                    SpawnInitialEnemiesForLevel(level); 
-                    // Make the first *timed* wave appear faster after initial spawns
-                    lastEnemySpawnTime = DateTime.Now.AddSeconds(-enemySpawnInterval.TotalSeconds + 0.5); // e.g., first timed wave after ~0.5 sec
-                    break;
-                case 5:
-                    // ... (level 5 setup) ...
-                    waterGoal = 0; fertilizerGoal = 0;
-                    gameMessage = "Level 5: The Source of Sorrow! Click to shoot.";
-                    enemySpawnInterval = TimeSpan.FromSeconds(9999);
-                    boss = new Boss(
-                        this.ClientSize.Width + BossSize,  // x
-                        this.ClientSize.Height / 2f - BossSize / 2f, // y
-                        BossSize,                          // size
-                        Color.DarkMagenta,                 // color
-                        1f,                                // speed
-                        50,                                // health
-                        this.ClientSize.Width,             // clientWidth (THE MISSING ARGUMENT)
-                        this.ClientSize.Height             // clientHeight
-                    );
-                    player.CanMoveFreely = true;
-                    player.Position = new PointF(this.ClientSize.Width * 0.2f, this.ClientSize.Height - PlayerSize - 50);
-                    lastEnemySpawnTime = DateTime.Now;
-                    break;
-                case 6:
-                    // ... (level 6 setup, consider faster spawns here too if needed) ...
-                    waterGoal = 0; fertilizerGoal = 0;
-                    gameMessage = "Level 6: A fragile memory... Click to shoot. (Flower health is critical). Press 'S' to 'save' (mock).";
-                    flower.State = FlowerState.Broken;
-                    player.CanMoveFreely = true; 
-                    enemySpawnInterval = TimeSpan.FromSeconds(1.8); // Faster spawns for L6 example
-                    SpawnInitialEnemiesForLevel(6); // If you decide to have initial spawns for L6
-                    lastEnemySpawnTime = DateTime.Now.AddSeconds(-enemySpawnInterval.TotalSeconds + 1.0);
-                    break;
-                default:
-                    // ... (game over logic) ...
-                    gameOver = true;
-                    gameMessage = $"You've completed all memories! Thanks for playing!\nFinal Flower State: {flower.State}";
-                    gameTimer.Stop();
-                    break;
-            }
-            levelComplete = false;
-        }
-
+        
         private void GameTimer_Tick(object sender, EventArgs e)
         {
-            if (gameOver || levelComplete)
+            switch (currentScreenState)
             {
-                this.Invalidate();
-                return;
+                case GameScreenState.Playing:
+                    UpdateGame();
+                    break;
             }
-            UpdateGame();
             this.Invalidate();
         }
-
+        
         private void UpdateGame()
         {
-            // Player Movement
-            float dx = 0;
-            float dy = 0;
-            bool allowPlayerMovementInput = true;
+            if (currentScreenState != GameScreenState.Playing) return;
 
-            if (currentLevel >= 2 && currentLevel <= 4) // Levels 2, 3, 4: Player is static
+            // Player Movement
+            float dx = 0; float dy = 0;
+            if (!(currentLevel >= 2 && currentLevel <= 4)) 
             {
-                allowPlayerMovementInput = false;
-            }
-    
-            if (allowPlayerMovementInput)
-            {
-                // Horizontal Movement
-                if (currentLevel != 5) // No horizontal movement in Level 5
+                if (currentLevel != 5) 
                 {
                     if (pressedKeys.Contains(Keys.Left) || pressedKeys.Contains(Keys.A)) dx = -player.Speed;
                     if (pressedKeys.Contains(Keys.Right) || pressedKeys.Contains(Keys.D)) dx = player.Speed;
                 }
-
-                // Vertical Movement (allowed if CanMoveFreely is true, which it is for L1, L5, L6)
-                if (player.CanMoveFreely) // player.CanMoveFreely is set to true for Level 5 in SetupLevel
+                if (player.CanMoveFreely) 
                 {
                     if (pressedKeys.Contains(Keys.Up) || pressedKeys.Contains(Keys.W)) dy = -player.Speed;
                     if (pressedKeys.Contains(Keys.Down) || pressedKeys.Contains(Keys.S)) dy = player.Speed;
                 }
-        
-                if (dx != 0 || dy != 0)
-                {
-                    player.Move(dx, dy, this.ClientRectangle);
-                }
+                if (dx != 0 || dy != 0) player.Move(dx, dy, this.ClientRectangle);
             }
 
+            // Updates
+            for (int i = playerProjectiles.Count - 1; i >= 0; i--) { if (!playerProjectiles[i].Update(ClientRectangle)) playerProjectiles.RemoveAt(i); }
+            for (int i = enemyProjectiles.Count - 1; i >= 0; i--) { if (!enemyProjectiles[i].Update(ClientRectangle)) enemyProjectiles.RemoveAt(i); }
+            for (int i = activeCollectibles.Count - 1; i >= 0; i--) { activeCollectibles[i].Update(); if (activeCollectibles[i].IsExpired) activeCollectibles.RemoveAt(i); }
 
-            // ... (Player Projectile Update logic - same) ...
-            for (int i = playerProjectiles.Count - 1; i >= 0; i--)
-            {
-                playerProjectiles[i].Update();
-                if (playerProjectiles[i].Position.X < -playerProjectiles[i].Size.Width ||
-                    playerProjectiles[i].Position.X > this.ClientSize.Width ||
-                    playerProjectiles[i].Position.Y < -playerProjectiles[i].Size.Height ||
-                    playerProjectiles[i].Position.Y > this.ClientSize.Height)
-                {
-                    playerProjectiles.RemoveAt(i);
-                }
-            }
-
-
-            // Enemy Spawning (timed, after initial wave)
-            if ((currentLevel >= 2 && currentLevel <= 4 || currentLevel == 6) && // Condition for which levels spawn timed enemies
+            // Timed Enemy Spawning
+            if ((currentLevel >= 2 && currentLevel <= 4 || currentLevel == 6) &&
                 (DateTime.Now - lastEnemySpawnTime) > enemySpawnInterval &&
-                 enemies.Count < (currentLevel == 4 ? 10 : currentLevel == 6 ? 8 : 7)) // Max enemies
+                 enemies.Count < (currentLevel == 4 ? 12 : currentLevel == 6 ? 10 : 8)) // Adjusted max enemies 
             {
                 EnemyType typeToSpawn = currentLevel switch {
                     2 => EnemyType.Slow, 3 => EnemyType.Fast, 4 => EnemyType.Faster, 6 => EnemyType.Slow, _ => EnemyType.Slow
                 };
-                
                 float spawnY;
-                if ((currentLevel >= 2 && currentLevel <= 4)) // For levels where player is static
-                {
-                    spawnY = player.Position.Y + random.Next(-player.Size.Height*2, player.Size.Height*2);
-                    spawnY = Math.Max(EnemyBaseSize, Math.Min(this.ClientSize.Height - EnemyBaseSize*2, spawnY));
-                } else { // For other levels like 6 where player might move, or general spawning
-                    spawnY = random.Next(EnemyBaseSize, this.ClientSize.Height - EnemyBaseSize);
-                }
-
-                // --- MODIFIED spawnX LOGIC FOR TIMED SPAWNS ---
-                float spawnX;
-                if (currentLevel >= 2 && currentLevel <= 4) // Levels 2, 3, 4: Enemies ONLY from the right
-                {
-                    spawnX = this.ClientSize.Width + random.Next(20, 150); // Random offset off-screen right
-                }
-                else // For other levels (e.g., Level 6, or future levels) allow random left/right
-                {
-                    spawnX = (random.Next(0,2) == 0) ? -EnemyBaseSize - random.Next(20,100) : this.ClientSize.Width + random.Next(20,150);
-                }
-                                
+                if ((currentLevel >= 2 && currentLevel <= 4) && player != null) { spawnY = player.Position.Y + random.Next(-player.Size.Height*2, player.Size.Height*2); } 
+                else { spawnY = random.Next(EnemyBaseSize, this.ClientSize.Height - EnemyBaseSize); }
+                spawnY = Math.Max(EnemyBaseSize, Math.Min(this.ClientSize.Height - EnemyBaseSize*2, spawnY)); float spawnX;
+                if (currentLevel >= 2 && currentLevel <= 4) { spawnX = this.ClientSize.Width + random.Next(20, 120); } 
+                else { spawnX = (random.Next(0,2) == 0) ? -EnemyBaseSize - random.Next(20,100) : this.ClientSize.Width + random.Next(20,150); }
                 Enemy newEnemy = new Enemy(spawnX, spawnY, EnemyBaseSize, typeToSpawn);
-
-                // Set speed direction based on spawn X and general target (flower/player)
-                // For levels 2, 3, 4, spawnX will always be > targetForEnemy.X, so speed will be negative.
-                PointF targetForEnemy = (currentLevel >= 2 && currentLevel <= 4) ? player.Position : flower.Position;
-                if (spawnX > targetForEnemy.X) 
-                {
-                    newEnemy.Speed = -Math.Abs(newEnemy.Speed);
-                }
-                else 
-                {
-                    newEnemy.Speed = Math.Abs(newEnemy.Speed); // This case applies if spawning from left is possible (e.g., Level 6)
-                }
-                
-                enemies.Add(newEnemy);
-                System.Diagnostics.Debug.WriteLine($"L{currentLevel} SPAWN_TIMED: Added enemy. Pos:({newEnemy.Position.X},{newEnemy.Position.Y}), Speed:{newEnemy.Speed}. Total enemies: {enemies.Count}");
-                lastEnemySpawnTime = DateTime.Now;
-                
-                // Update Collectibles (and remove if expired)
-                for (int i = activeCollectibles.Count - 1; i >= 0; i--)
-                {
-                    activeCollectibles[i].Update(); // This will set IsExpired if lifespan is up
-                    if (activeCollectibles[i].IsExpired)
-                    {
-                        activeCollectibles.RemoveAt(i);
-                    }
-                }
+                PointF targetForEnemy = (currentLevel >= 2 && currentLevel <= 4 && player != null) ? player.Position : flower.Position;
+                if (spawnX > targetForEnemy.X) newEnemy.Speed = -Math.Abs(newEnemy.Speed); else newEnemy.Speed = Math.Abs(newEnemy.Speed);
+                enemies.Add(newEnemy); lastEnemySpawnTime = DateTime.Now;
             }
 
-            // ... (Update Enemies, Boss Logic, Update Enemy Projectiles, Update Collectibles, Feedback Message Expiry - same) ...
-            for (int i = enemies.Count - 1; i >= 0; i--)
-            {
-                PointF targetPos = (currentLevel >=2 && currentLevel <=4) ? player.Position : flower.Position;
+            // Enemy Updates
+            for (int i = enemies.Count - 1; i >= 0; i--) {
+                PointF targetPos = (currentLevel >=2 && currentLevel <=4 && player != null) ? player.Position : flower.Position;
                 enemies[i].Update(targetPos); 
-
-                if (enemies[i].Bounds.IntersectsWith(flower.Bounds))
-                {
-                    flower.TakeDamage();
-                    enemies.RemoveAt(i);
-                    if (flower.State == FlowerState.Dead) { gameOver = true; gameMessage = "The memory faded... The flower is gone.\nPress Enter to Restart."; gameTimer.Stop(); return;}
-                }
-                else if (enemies[i].Position.X < -enemies[i].Size.Width * 2 || enemies[i].Position.X > this.ClientSize.Width + enemies[i].Size.Width)
-                {
+                if (enemies[i].Bounds.IntersectsWith(flower.Bounds)) {
+                    flower.TakeDamage(); enemies.RemoveAt(i);
+                    if (flower.State == FlowerState.Dead) { HandleGameOver("The memory faded... The flower is gone."); return;}
+                } else if (enemies[i].Position.X < -enemies[i].Size.Width * 1.5f || enemies[i].Position.X > this.ClientSize.Width + enemies[i].Size.Width * 1.5f) {
                     enemies.RemoveAt(i);
                 }
             }
 
-            // ... (Boss Logic, Update Enemy Projectiles, Update Collectibles, Feedback Message Expiry - same as before) ...
-            // In GameForm.cs, inside UpdateGame() method, within the if (boss != null) block:
-
-            if (boss != null)
-            {
+            // Boss Logic
+            if (boss != null && currentLevel == 5) {
                 boss.Update(this.ClientSize.Width, this.ClientSize.Height);
-
-                // Handle Special Attack State
-                if (isBossPerformingSpecialAttack)
-                {
-                    if (DateTime.Now < bossSpecialAttackEndTime)
-                    {
-                        // Fire projectiles during special attack (e.g., circular burst)
-                        // This will fire very rapidly, adjust projectile count or add small tick delay
-                        int projectilesInBurst = 24; // Example: 24 projectiles in a full circle
-                        PointF bossCenter = new PointF(boss.Position.X + boss.Size.Width / 2f, boss.Position.Y + boss.Size.Height / 2f);
-                        
-                        // Fire a few projectiles per game tick during the special attack to make it a stream/burst
-                        // This needs careful tuning to avoid too many objects at once.
-                        // Let's fire a full circle over the duration.
-                        // A simpler approach: fire a few aimed shots or a small pattern each tick of special.
-
-                        // For a "barrage from all directions" effect, let's do a circular burst more slowly
-                        // over the duration, or one big burst then wait.
-                        // Let's try one big burst at the start of the special.
-                        // This logic below is for a continuous stream during the special attack.
-
-                        if (specialAttackProjectilesPerTick < 2) // Fire 2 projectiles per game tick (approx 120/sec if 60fps) - DANGEROUS!
-                        {                                       // This needs a sub-timer or a counter for the pattern.
-
-                            // Let's simplify: Fire a full circle burst ONCE when special attack starts,
-                            // or a few projectiles each tick in random/sweeping directions.
-
-                            // Example: Fire 3 random direction projectiles this tick
-                            for(int r=0; r<2; r++) { // Fire 2 random projectiles per tick of special
+                PointF bossCenter = new PointF(boss.Position.X + boss.Size.Width / 2f, boss.Position.Y + boss.Size.Height / 2f);
+                if (isBossPerformingSpecialAttack) {
+                    if (DateTime.Now < bossSpecialAttackEndTime) {
+                        if (random.Next(0, 3) == 0) { // Increased chance/rate of special projectiles
+                            for(int r=0; r < random.Next(2,5) ; r++) { 
                                 float randomAngleRad = (float)(random.NextDouble() * 2 * Math.PI);
-                                float velX = (float)Math.Cos(randomAngleRad) * (EnemyProjectileSpeed * 0.8f); // Slightly slower special projectiles
+                                float velX = (float)Math.Cos(randomAngleRad) * (EnemyProjectileSpeed * 0.8f); 
                                 float velY = (float)Math.Sin(randomAngleRad) * (EnemyProjectileSpeed * 0.8f);
-                                enemyProjectiles.Add(new Projectile(
-                                    bossCenter.X - ProjectileSize / 2f, bossCenter.Y - ProjectileSize / 2f,
-                                    ProjectileSize, Color.OrangeRed, new PointF(velX, velY), ProjectileType.Enemy));
+                                enemyProjectiles.Add(new Projectile(bossCenter.X - ProjectileSize / 2f, bossCenter.Y - ProjectileSize / 2f, ProjectileSize, Color.OrangeRed, new PointF(velX, velY), ProjectileType.Enemy));
                             }
                         }
-                        // A better way for a "barrage" might be to spawn a pattern over several ticks.
-                        // For now, this is a rapid random fire.
-                    }
-                    else
-                    {
-                        isBossPerformingSpecialAttack = false; // Special attack ended
-                        lastBossSpecialAttackTime = DateTime.Now; // Reset timer for next special
-                    }
-                }
-                else // Normal shooting logic
-                {
-                    // Check if it's time to START a special attack
-                    if ((DateTime.Now - lastBossSpecialAttackTime) > bossSpecialAttackInterval)
-                    {
+                    } else { isBossPerformingSpecialAttack = false; lastBossSpecialAttackTime = DateTime.Now; }
+                } else {
+                    if ((DateTime.Now - lastBossSpecialAttackTime) > bossSpecialAttackInterval) {
                         isBossPerformingSpecialAttack = true;
                         bossSpecialAttackEndTime = DateTime.Now.Add(bossSpecialAttackDuration);
-                        temporaryFeedbackMessage = "Boss Special Attack!";
-                        feedbackMessageExpiry = DateTime.Now.AddSeconds(1);
-                        // One large burst at the start of the special could be here:
-                        // FireCircularBurst(18, bossCenter, EnemyProjectileSpeed * 0.7f, Color.OrangeRed);
-
-                    } // Normal spread shot (if not in special attack cooldown right after it finishes)
-                    else if ((DateTime.Now - lastBossShootTime) > bossShootCooldown) 
-                    {
-                        // ... (existing spread shot logic from Revision 1)
-                        int projectilesInSpread = 3; 
-                        float totalSpreadAngleDegrees = 40f; 
-                        PointF boss_Center = new PointF(boss.Position.X + boss.Size.Width / 2f, boss.Position.Y + boss.Size.Height / 2f);
-                        PointF player_Center = new PointF(player.Position.X + player.Size.Width / 2f, player.Position.Y + player.Size.Height / 2f);
-                        float angleToPlayerRad = (float)Math.Atan2(player_Center.Y - boss_Center.Y, player_Center.X - boss_Center.X);
+                        temporaryFeedbackMessage = "Boss Attack!"; feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5);
+                        FireCircularBurst(random.Next(12,25), bossCenter, EnemyProjectileSpeed * 0.65f, Color.MediumVioletRed); // Randomized burst
+                    } else if ((DateTime.Now - lastBossShootTime) > bossShootCooldown) {
+                        int projectilesInSpread = random.Next(3,8); float totalSpreadAngleDegrees = random.Next(25,75); 
+                        PointF playerCenter = (player != null) ? new PointF(player.Position.X + player.Size.Width / 2f, player.Position.Y + player.Size.Height / 2f) : bossCenter;
+                        float angleToPlayerRad = (float)Math.Atan2(playerCenter.Y - bossCenter.Y, playerCenter.X - bossCenter.X);
                         float startAngleRad = angleToPlayerRad - (totalSpreadAngleDegrees / 2f * (float)Math.PI / 180f);
-                        float angleIncrementRad = 0f;
-                        if (projectilesInSpread > 1) angleIncrementRad = (totalSpreadAngleDegrees * (float)Math.PI / 180f) / (projectilesInSpread - 1);
-
-                        for (int k = 0; k < projectilesInSpread; k++)
-                        {
+                        float angleIncrementRad = (projectilesInSpread > 1) ? (totalSpreadAngleDegrees * (float)Math.PI / 180f) / (projectilesInSpread - 1) : 0;
+                        for (int k = 0; k < projectilesInSpread; k++) {
                             float currentAngleRad = startAngleRad + (k * angleIncrementRad);
-                            float velocityX = (float)Math.Cos(currentAngleRad) * EnemyProjectileSpeed;
-                            float velocityY = (float)Math.Sin(currentAngleRad) * EnemyProjectileSpeed;
-                            enemyProjectiles.Add(new Projectile(
-                                boss_Center.X - ProjectileSize / 2f, boss_Center.Y - ProjectileSize / 2f,
-                                ProjectileSize, Color.HotPink, new PointF(velocityX, velocityY), ProjectileType.Enemy));
+                            float velocityX = (float)Math.Cos(currentAngleRad) * EnemyProjectileSpeed; float velocityY = (float)Math.Sin(currentAngleRad) * EnemyProjectileSpeed;
+                            enemyProjectiles.Add(new Projectile(bossCenter.X - ProjectileSize / 2f, bossCenter.Y - ProjectileSize / 2f, ProjectileSize, Color.HotPink, new PointF(velocityX, velocityY), ProjectileType.Enemy));
                         }
                         lastBossShootTime = DateTime.Now;
                     }
                 }
             }
-
-            for (int i = enemyProjectiles.Count - 1; i >= 0; i--)
-            {
-                enemyProjectiles[i].Update();
-                if (enemyProjectiles[i].Position.Y > this.ClientSize.Height || enemyProjectiles[i].Position.Y < -enemyProjectiles[i].Size.Height ||
-                    enemyProjectiles[i].Position.X > this.ClientSize.Width || enemyProjectiles[i].Position.X < -enemyProjectiles[i].Size.Width)
-                {
-                    enemyProjectiles.RemoveAt(i);
-                }
-            }
-            for (int i = activeCollectibles.Count - 1; i >= 0; i--)
-            {
-                activeCollectibles[i].Update();
-            }
-            if (DateTime.Now > feedbackMessageExpiry)
-            {
-                temporaryFeedbackMessage = "";
-            }
-
-
+            
+            if (DateTime.Now > feedbackMessageExpiry) temporaryFeedbackMessage = "";
             CheckCollisions();
-            CheckLevelCompletion();
+            if(currentScreenState == GameScreenState.Playing) CheckLevelCompletion();
         }
         
-        // REVISION 2: Mouse Click Shooting
-        private void GameForm_MouseClick(object sender, MouseEventArgs e)
-        {
-            // No shooting if game over, level complete, or in level 1 (no enemies)
-            // Or if player is static and shouldn't shoot (but current assumption is static player CAN shoot)
-            if (gameOver || levelComplete || currentLevel == 1) return;
+        private void FireCircularBurst(int count, PointF origin, float speed, Color projColor) {
+            for (int k = 0; k < count; k++) {
+                float angleRad = (float)(k * (2 * Math.PI / count));
+                float velX = (float)Math.Cos(angleRad) * speed; float velY = (float)Math.Sin(angleRad) * speed;
+                enemyProjectiles.Add(new Projectile( origin.X - ProjectileSize / 2f, origin.Y - ProjectileSize / 2f, ProjectileSize, projColor, new PointF(velX, velY), ProjectileType.Enemy));
+            }
+        }
 
-            // Only shoot on left click and if cooldown has passed
-            if (e.Button == MouseButtons.Left && (DateTime.Now - lastPlayerShootTime) > playerShootCooldown)
-            {
-                PointF playerCenter = new PointF(player.Position.X + player.Size.Width / 2f, player.Position.Y + player.Size.Height / 2f);
-                
-                // Calculate direction vector from player center to mouse click
-                float dirX = e.X - playerCenter.X;
-                float dirY = e.Y - playerCenter.Y;
-                float length = (float)Math.Sqrt(dirX * dirX + dirY * dirY);
-
-                if (length > 0) // Ensure there's a direction (avoid division by zero)
-                {
-                    // Normalize direction vector
-                    float normalizedDirX = dirX / length;
-                    float normalizedDirY = dirY / length;
-
-                    // Calculate velocity
-                    float velocityX = normalizedDirX * PlayerProjectileSpeed;
-                    float velocityY = normalizedDirY * PlayerProjectileSpeed;
-
-                    // Calculate spawn position: slightly outside the player's radius in the direction of the shot
-                    // This helps avoid the projectile spawning inside the player
-                    float spawnRadiusOffset = player.Size.Width / 2f + 2; // Player radius + small gap
-                    float spawnX = playerCenter.X + normalizedDirX * spawnRadiusOffset - ProjectileSize / 2f;
-                    float spawnY = playerCenter.Y + normalizedDirY * spawnRadiusOffset - ProjectileSize / 2f;
-                    
-                    playerProjectiles.Add(new Projectile(
-                        spawnX,
-                        spawnY,
-                        ProjectileSize,
-                        Color.LightSkyBlue,
-                        new PointF(velocityX, velocityY),
-                        ProjectileType.Player));
-
-                    lastPlayerShootTime = DateTime.Now;
+        private void HandleGameOver(string message) {
+            if (currentScreenState == GameScreenState.GameOver) return;
+            currentScreenState = GameScreenState.GameOver;
+            gameMessage = message;
+        }
+        
+        private void GameForm_MouseClick(object sender, MouseEventArgs e) {
+            if (e.Button == MouseButtons.Left) {
+                if (currentScreenState == GameScreenState.Playing) {
+                    if (currentLevel == 1 && !enemies.Any()) return; 
+                    if ((DateTime.Now - lastPlayerShootTime) > playerShootCooldown && player != null) {
+                        PointF playerCenter = new PointF(player.Position.X + player.Size.Width / 2f, player.Position.Y + player.Size.Height / 2f);
+                        float dirX = e.X - playerCenter.X; float dirY = e.Y - playerCenter.Y; float length = (float)Math.Sqrt(dirX * dirX + dirY * dirY);
+                        if (length > 0) {
+                            float normX = dirX/length; float normY = dirY/length;
+                            playerProjectiles.Add(new Projectile( playerCenter.X + normX * (player.Size.Width/2f + 3) - ProjectileSize/2f, playerCenter.Y + normY * (player.Size.Height/2f + 3) - ProjectileSize/2f, ProjectileSize, Color.LightSkyBlue, new PointF(normX * PlayerProjectileSpeed, normY * PlayerProjectileSpeed), ProjectileType.Player));
+                            lastPlayerShootTime = DateTime.Now;
+                        }
+                    }
                 }
             }
         }
 
-
-        private void CheckCollisions()
-        {
-            // Player Projectiles vs Enemies (Enemy drop logic is already here)
-            for (int i = playerProjectiles.Count - 1; i >= 0; i--)
-            {
-                for (int j = enemies.Count - 1; j >= 0; j--)
-                {
-                    if (playerProjectiles[i].Bounds.IntersectsWith(enemies[j].Bounds))
-                    {
+        private void CheckCollisions() {
+            if (player == null) return;
+            // Player Projectiles vs Enemies
+            for (int i = playerProjectiles.Count - 1; i >= 0; i--) {
+                for (int j = enemies.Count - 1; j >= 0; j--) {
+                    if (i < playerProjectiles.Count && playerProjectiles[i].Bounds.IntersectsWith(enemies[j].Bounds)) { // Check i validity
                         enemies[j].Health--;
-                        if (enemies[j].Health <= 0)
-                        {
-                            if (currentLevel >= 2 && currentLevel <= 4)
-                            {
-                                if (random.NextDouble() < COLLECTIBLE_DROP_CHANCE)
-                                {
-                                    CollectibleType dropType = (random.Next(0, 2) == 0) ? CollectibleType.Water : CollectibleType.Fertilizer;
-                                    // CORRECTED Spawn Offset for Collectible:
-                                    float collectibleSpawnOffsetX = enemies[j].Position.X + enemies[j].Size.Width / 2f - Collectible.DefaultSize / 2f;
-                                    float collectibleSpawnOffsetY = enemies[j].Position.Y + enemies[j].Size.Height / 2f - Collectible.DefaultSize / 2f;
-                                    activeCollectibles.Add(new Collectible(collectibleSpawnOffsetX, collectibleSpawnOffsetY, dropType));
-                                }
+                        if (enemies[j].Health <= 0) {
+                            if (currentLevel >= 2 && currentLevel <= 4 && random.NextDouble() < COLLECTIBLE_DROP_CHANCE) {
+                                CollectibleType dropType = (random.Next(0, 2) == 0) ? CollectibleType.Water : CollectibleType.Fertilizer;
+                                activeCollectibles.Add(new Collectible(
+                                    enemies[j].Position.X + enemies[j].Size.Width / 2f - Collectible.DefaultSize / 2f, 
+                                    enemies[j].Position.Y + enemies[j].Size.Height / 2f - Collectible.DefaultSize / 2f, dropType));
                             }
                             enemies.RemoveAt(j);
                         }
-                        playerProjectiles.RemoveAt(i);
-                        break; 
+                        playerProjectiles.RemoveAt(i); break; 
                     }
                 }
             }
-
-            // ... (Rest of CheckCollisions: Player Projectiles vs Boss, Enemy Projectiles vs Player, Player vs Enemies, Player vs Boss, Player vs Collectibles - mostly same as before) ...
             // Player Projectiles vs Boss
-            if (boss != null)
-            {
-                for (int i = playerProjectiles.Count - 1; i >= 0; i--)
-                {
-                    if (playerProjectiles[i] != null && playerProjectiles[i].Bounds.IntersectsWith(boss.Bounds))
-                    {
-                        // --- ADD DEBUG LINE AND TEMPORARY FEEDBACK ---
-                        System.Diagnostics.Debug.WriteLine($"BOSS HIT! Current HP: {boss.Health}, Projectile: {playerProjectiles[i].Position}");
+            if (boss != null && currentLevel == 5) {
+                for (int i = playerProjectiles.Count - 1; i >= 0; i--) {
+                    if (i < playerProjectiles.Count && playerProjectiles[i].Bounds.IntersectsWith(boss.Bounds)) { // Check i validity
+                        Debug.WriteLine($"BOSS HIT! HP Before: {boss.Health}");
                         boss.Health--;
-                        temporaryFeedbackMessage = $"Boss Hit! HP: {boss.Health}"; // Visual feedback
-                        feedbackMessageExpiry = DateTime.Now.AddSeconds(1);
-                        // --- END DEBUG ---
+                        temporaryFeedbackMessage = $"Boss Hit! HP: {boss.Health}"; feedbackMessageExpiry = DateTime.Now.AddSeconds(1);
                         playerProjectiles.RemoveAt(i);
-                        if (boss.Health <= 0)
-                        {
-                            System.Diagnostics.Debug.WriteLine("BOSS DEFEATED!"); // Confirm defeat
-                            boss = null; 
-                        }
+                        if (boss.Health <= 0) { Debug.WriteLine("BOSS DEFEATED!"); boss = null; /* Completion handled by CheckLevelCompletion */ }
                         break; 
                     }
                 }
             }
-            // Ensure Player vs Collectibles only happens if player CAN move to them, or if collectibles can move to player.
-            // Since player is static in Lvl 2-4, collectibles should ideally fall near player or player has a small collection radius.
-            // For now, player needs to be on top of them, which won't happen if static.
-            // Let's give player a small collection radius around them for levels 2-4.
-
-            // Player vs Collectibles (MODIFIED for static player in Lvl 2-4)
-            if (currentLevel >= 2 && currentLevel <= 4)
-            {
-                RectangleF collectionZone = player.Bounds;
-                if (currentLevel >= 2 && currentLevel <= 4) // If player is static
-                {
-                    collectionZone.Inflate(player.Size.Width * inflation, player.Size.Height * inflation); // Player has a small aura to collect
-                }
-
-                for (int i = activeCollectibles.Count - 1; i >= 0; i--)
-                {
-                    if (collectionZone.IntersectsWith(activeCollectibles[i].Bounds)) // Use collectionZone
-                    {
-                        Collectible collected = activeCollectibles[i];
+            // Player vs Collectibles
+            if (currentLevel >= 2 && currentLevel <= 4) {
+                RectangleF collectionZone = player.Bounds; float actualInflation = player.Size.Width * inflation; collectionZone.Inflate(actualInflation, actualInflation); 
+                for (int k = activeCollectibles.Count - 1; k >= 0; k--) {
+                    // Debug.WriteLine($"Checking collectible [{k}] Bounds: {activeCollectibles[k].Bounds} against Zone: {collectionZone}. Intersects: {collectionZone.IntersectsWith(activeCollectibles[k].Bounds)}");
+                    if (collectionZone.IntersectsWith(activeCollectibles[k].Bounds)) {
+                        // Debug.WriteLine($"    COLLECTED! Collectible {k}");
+                        Collectible collected = activeCollectibles[k];
                         if (collected.Type == CollectibleType.Water) { waterProgress++; temporaryFeedbackMessage = "+1 Water!"; }
-                        else if (collected.Type == CollectibleType.Fertilizer) { fertilizerProgress++; temporaryFeedbackMessage = "+1 Fertilizer!"; }
+                        else { fertilizerProgress++; temporaryFeedbackMessage = "+1 Fertilizer!"; }
                         feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5);
-                        activeCollectibles.RemoveAt(i);
+                        activeCollectibles.RemoveAt(k);
                     }
                 }
             }
             // Enemy Projectiles vs Player
-            for (int i = enemyProjectiles.Count - 1; i >= 0; i--)
-            {
-                if (enemyProjectiles[i].Bounds.IntersectsWith(player.Bounds))
-                {
-                    enemyProjectiles.RemoveAt(i);
-                    flower.TakeDamage(); 
-                    if (flower.State == FlowerState.Dead) {
-                        gameOver = true;
-                        gameMessage = "You couldn't protect the memory... It shattered.\nPress Enter to Restart.";
-                    } else {
-                        temporaryFeedbackMessage = "Ouch! Be careful!";
-                        feedbackMessageExpiry = DateTime.Now.AddSeconds(2);
-                    }
-                    if(gameOver) gameTimer.Stop();
-                    return;
+            for (int i = enemyProjectiles.Count - 1; i >= 0; i--) {
+                if (i < enemyProjectiles.Count && enemyProjectiles[i].Bounds.IntersectsWith(player.Bounds)) { // Check i validity
+                    enemyProjectiles.RemoveAt(i); flower.TakeDamage(); 
+                    if (flower.State == FlowerState.Dead) { HandleGameOver("You couldn't protect the memory... It shattered."); return; }
+                    else { temporaryFeedbackMessage = "Ouch! Be careful!"; feedbackMessageExpiry = DateTime.Now.AddSeconds(2); }
                 }
             }
-
-            // Player vs Enemies (direct collision)
-            // This might not happen if player is static and far from where enemies reach flower,
-            // but keeping it for edge cases or if enemies pass through player to get to flower.
+            // Player vs Enemies
             for (int i = enemies.Count - 1; i >= 0; i--)
             {
-                if (player.Bounds.IntersectsWith(enemies[i].Bounds))
-                {
-                     enemies.RemoveAt(i); 
-                    flower.TakeDamage(); 
-                     if (flower.State == FlowerState.Dead) {
-                        gameOver = true;
-                        gameMessage = "The chaos was too much for the fragile memory.\nPress Enter to Restart.";
-                    } else {
-                        temporaryFeedbackMessage = "They got too close to you!";
-                        feedbackMessageExpiry = DateTime.Now.AddSeconds(2);
-                    }
-                    if(gameOver) gameTimer.Stop();
-                    return;
+                if (i < enemies.Count && player.Bounds.IntersectsWith(enemies[i].Bounds)) { // Check i validity
+                    enemies.RemoveAt(i); flower.TakeDamage(); 
+                    if (flower.State == FlowerState.Dead) { HandleGameOver("The chaos was too much for the fragile memory."); return; }
+                    else { temporaryFeedbackMessage = "They got too close to you!"; feedbackMessageExpiry = DateTime.Now.AddSeconds(2); }
                 }
             }
-            
+            // Player Projectiles vs Enemy Projectiles
             for (int i = playerProjectiles.Count - 1; i >= 0; i--)
             {
                 for (int j = enemyProjectiles.Count - 1; j >= 0; j--)
                 {
-                    // Important: Check if projectiles still exist in lists, as one might have been removed
-                    // by a collision with something else in the same CheckCollisions() call.
-                    // However, iterating backwards helps mitigate issues with removal.
-                    if (i < playerProjectiles.Count && j < enemyProjectiles.Count) // Ensure valid indices
-                    {
-                        if (playerProjectiles[i].Bounds.IntersectsWith(enemyProjectiles[j].Bounds))
-                        {
-                            System.Diagnostics.Debug.WriteLine("PROJECTILE CLASH!");
-                            playerProjectiles.RemoveAt(i);
-                            enemyProjectiles.RemoveAt(j);
-                            // No need for temporaryFeedbackMessage here unless desired, can be spammy
-                            goto nextPlayerProjectileCheck; // Break from inner loop (j) and continue outer (i)
+                    if (i < playerProjectiles.Count && j < enemyProjectiles.Count) {
+                        if (playerProjectiles[i].Bounds.IntersectsWith(enemyProjectiles[j].Bounds)) {
+                            Debug.WriteLine("PROJECTILE CLASH!");
+                            playerProjectiles.RemoveAt(i); enemyProjectiles.RemoveAt(j);
+                            goto nextPlayerProjectileClashCheck; 
                         }
                     }
-                }
-                nextPlayerProjectileCheck:; // Label for the goto
-            }
-            
-            for (int i = playerProjectiles.Count - 1; i >= 0; i--)
-            {
-                for (int j = enemyProjectiles.Count - 1; j >= 0; j--)
-                {
-                    // Important: Check if projectiles still exist in lists, as one might have been removed
-                    // by a collision with something else in the same CheckCollisions() call.
-                    // However, iterating backwards helps mitigate issues with removal.
-                    if (i < playerProjectiles.Count && j < enemyProjectiles.Count) // Ensure valid indices
-                    {
-                        if (playerProjectiles[i].Bounds.IntersectsWith(enemyProjectiles[j].Bounds))
-                        {
-                            System.Diagnostics.Debug.WriteLine("PROJECTILE CLASH!");
-                            playerProjectiles.RemoveAt(i);
-                            enemyProjectiles.RemoveAt(j);
-                            // No need for temporaryFeedbackMessage here unless desired, can be spammy
-                            goto nextPlayerProjectileCheck; // Break from inner loop (j) and continue outer (i)
-                        }
-                    }
-                }
-                nextPlayerProjectileCheck:; // Label for the goto
+                } nextPlayerProjectileClashCheck:;
             }
         }
 
-        // ... (CheckLevelCompletion - same as before) ...
-        private void CheckLevelCompletion()
-        {
-            if (levelComplete) return;
+        private void CheckLevelCompletion() {
+            if (currentScreenState != GameScreenState.Playing) return;
             bool conditionsMet = false;
-
-            switch (currentLevel)
-            {
-                case 1:
-                    if (waterProgress >= waterGoal && fertilizerProgress >= fertilizerGoal) conditionsMet = true;
-                    break;
-                case 2: case 3: case 4:
-                    if (waterProgress >= waterGoal && fertilizerProgress >= fertilizerGoal) conditionsMet = true;
-                    break;
-                case 5:
-                    if (boss == null && !gameOver) conditionsMet = true;
-                    break;
-                case 6:
-                     if (enemies.Count == 0 && !AnyEnemiesSpawningSoon() && flower.State != FlowerState.Dead && !gameOver && !levelComplete)
-                    {
-                        // For level 6, let's make it complete explicitly via a message or after a wave for simplicity for now
-                        // This could be a placeholder for a more specific win condition.
-                        // Let's assume if player survives initial spawns and flower isn't dead, then can proceed.
-                        // To avoid auto-complete if just one enemy spawned and killed, let's add a small delay or a dummy goal.
-                        // For now, it will complete if enemies list is empty and no more are spawning soon.
-                    }
-                    break;
+            switch (currentLevel) {
+                case 1: if (waterProgress >= waterGoal && fertilizerProgress >= fertilizerGoal) conditionsMet = true; break;
+                case 2: case 3: case 4: if (waterProgress >= waterGoal && fertilizerProgress >= fertilizerGoal) conditionsMet = true; break;
+                case 5: if (boss == null) conditionsMet = true; break;
+                case 6: if (enemies.Count == 0 && !AnyEnemiesSpawningSoon() && flower.State != FlowerState.Dead) { /* conditionsMet = true; */ } break;
             }
-
-            if (conditionsMet)
-            {
-                levelComplete = true;
-                gameTimer.Stop();
-                gameMessage = $"Level {currentLevel} Complete!\nPress Enter to Continue.";
-                temporaryFeedbackMessage = ""; 
-            }
+            if (conditionsMet) { currentScreenState = GameScreenState.LevelTransition; gameMessage = $"Level {currentLevel} Complete!"; temporaryFeedbackMessage = ""; }
         }
+
         private bool AnyEnemiesSpawningSoon()
         {
-             if ((currentLevel >= 2 && currentLevel <= 4 || currentLevel == 6) && 
-                 (DateTime.Now - lastEnemySpawnTime) <= enemySpawnInterval && 
-                 enemies.Count < (currentLevel == 4 ? 12 : currentLevel == 6 ? 7 : 8) ) // Check against max enemies too
-                return true;
-            return false;
+            return (currentLevel >= 2 && currentLevel <= 4 || currentLevel == 6) && 
+                   (DateTime.Now - lastEnemySpawnTime) <= enemySpawnInterval && 
+                   enemies.Count < (currentLevel == 4 ? 12 : currentLevel == 6 ? 8 : 8) ; // Adjusted max enemies
         }
-
-
-        // ... (GameForm_Paint - mostly same, ensure game messages are updated if needed) ...
-        private void GameForm_Paint(object sender, PaintEventArgs e)
-        {
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-
-            flower.Draw(g);
-            player.Draw(g);
-
-            foreach (var projectile in playerProjectiles) projectile.Draw(g);
-            foreach (var collectible in activeCollectibles) collectible.Draw(g);
-            foreach (var enemy in enemies) enemy.Draw(g);
-            if (boss != null) boss.Draw(g);
-            foreach (var projectile in enemyProjectiles) projectile.Draw(g);
+        
+        private void DrawGamePlayingState(Graphics g) {
+            if (flower == null || player == null) return;
+            flower.Draw(g); player.Draw(g);
+            foreach (var p in playerProjectiles) p.Draw(g); foreach (var c in activeCollectibles) c.Draw(g);
+            foreach (var en in enemies) en.Draw(g); if (boss != null) boss.Draw(g);
+            foreach (var ep in enemyProjectiles) ep.Draw(g);
+            // UI Text
+            string lt = $"Level: {currentLevel}"; g.DrawString(lt, gameFont, Brushes.LightGray, 10,10);
+            string fst = $"Flower: {flower.State}"; g.DrawString(fst, gameFont, Brushes.LightGray, 10, 10+gameFont.Height+2);
+            string ot = ""; if (currentLevel==1) ot = $"Care (E/R): W:{waterProgress}/{waterGoal} F:{fertilizerProgress}/{fertilizerGoal}"; else if (currentLevel >=2 && currentLevel <=4) ot = $"Collect: W:{waterProgress}/{waterGoal} F:{fertilizerProgress}/{fertilizerGoal}";
+            if (!string.IsNullOrEmpty(ot)) g.DrawString(ot, objectiveFont, Brushes.Gold, 10, 10+(gameFont.Height+2)*2);
             
-            if (currentLevel >= 2 && currentLevel <= 4 && !gameOver && !levelComplete)
-            {
-                // Draw the player's actual bounds (for reference)
-                using (Pen playerPen = new Pen(Color.FromArgb(100, Color.LightGreen), 1)) // Semi-transparent green
-                {
-                    e.Graphics.DrawRectangle(playerPen, Rectangle.Round(player.Bounds));
-                }
-
-                // Calculate and draw the inflated collection zone
-                RectangleF cz = player.Bounds;
-                cz.Inflate(player.Size.Width * inflation, player.Size.Height * inflation); // Inflation by 30 on each side
-                using (Pen zonePen = new Pen(Color.FromArgb(150, Color.Yellow), 2)) // Semi-transparent yellow, thicker
-                {
-                    e.Graphics.DrawRectangle(zonePen, Rectangle.Round(cz));
-                    // Optionally, draw text to confirm zone coords for precise debugging
-                    // string zoneInfo = $"CZ:({cz.X:F0},{cz.Y:F0}) W:{cz.Width:F0} H:{cz.Height:F0}";
-                    // e.Graphics.DrawString(zoneInfo, smallFont, Brushes.Yellow, cz.Location.X, cz.Location.Y - 15);
-                }
-
-                // Draw bounds of active collectibles
-                foreach (var collectible in activeCollectibles)
-                {
-                    using (Pen collectiblePen = new Pen(Color.FromArgb(150, Color.Cyan), 1)) // Semi-transparent cyan
-                    {
-                        e.Graphics.DrawRectangle(collectiblePen, Rectangle.Round(collectible.Bounds));
-                        // string collInfo = $"C:({collectible.Position.X:F0},{collectible.Position.Y:F0})";
-                        // e.Graphics.DrawString(collInfo, smallFont, Brushes.Cyan, collectible.Position.X, collectible.Position.Y - 10);
-                    }
-                }
-            }
-
-            string levelText = $"Level: {currentLevel}";
-            string flowerStateText = $"Flower: {flower.State}";
-            SizeF levelTextSize = g.MeasureString(levelText, gameFont);
-            g.DrawString(levelText, gameFont, Brushes.LightGray, 10, 10);
-            g.DrawString(flowerStateText, gameFont, Brushes.LightGray, 10, 10 + levelTextSize.Height + 5);
-
-            string objectiveText = "";
-            if (currentLevel == 1) objectiveText = $"Care: (E) Water: {waterProgress}/{waterGoal} | (R) Fertilizer: {fertilizerProgress}/{fertilizerGoal}";
-            else if (currentLevel >= 2 && currentLevel <= 4) objectiveText = $"Collect: Water: {waterProgress}/{waterGoal} | Fertilizer: {fertilizerProgress}/{fertilizerGoal}";
-            
-            if (!string.IsNullOrEmpty(objectiveText))
-            {
-                g.DrawString(objectiveText, objectiveFont, Brushes.Gold, 10, 10 + levelTextSize.Height + 5 + g.MeasureString(flowerStateText, gameFont).Height + 5);
-            }
-            
-            if (!string.IsNullOrEmpty(temporaryFeedbackMessage))
-            {
+            if (!string.IsNullOrEmpty(temporaryFeedbackMessage) && DateTime.Now < feedbackMessageExpiry) {
                 SizeF feedbackSize = g.MeasureString(temporaryFeedbackMessage, gameFont);
                 float feedbackX = (this.ClientSize.Width - feedbackSize.Width) / 2;
-                float feedbackY = player.Position.Y - player.Size.Height - 15; 
+                float feedbackY = (player != null ? player.Position.Y : this.ClientSize.Height / 2f) - PlayerSize - 15; 
                 if (feedbackY < 10) feedbackY = this.ClientSize.Height - 40; 
                 g.DrawString(temporaryFeedbackMessage, gameFont, Brushes.Lime, feedbackX, feedbackY);
             }
 
-            // BUG FIX 1: Adjusted message display logic
-            if (gameOver || levelComplete) // Big overlay for game over or level complete
-            {
-                using (SolidBrush overlayBrush = new SolidBrush(Color.FromArgb(180, 0, 0, 0)))
-                {
-                    g.FillRectangle(overlayBrush, 0, this.ClientSize.Height / 3f, this.ClientSize.Width, this.ClientSize.Height / 3f);
-                }
-                TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak;
-                Rectangle rectMessage = new Rectangle(0, (int)(this.ClientSize.Height / 3f), this.ClientSize.Width, (int)(this.ClientSize.Height / 3f));
-                
-                TextRenderer.DrawText(g, gameMessage, titleFont, rectMessage, Color.White, flags); // gameMessage is set appropriately by SetupLevel or completion/game over
-
-                // Restart/Continue prompts
-                 if (gameOver && currentLevel < 7) { 
-                     string restartMsg = "Press Enter to Restart Level or Escape to Quit.";
-                     Rectangle rectRestart = new Rectangle(0, (int)(this.ClientSize.Height * 2/3f) - 30 , this.ClientSize.Width, 60);
-                     TextRenderer.DrawText(g, restartMsg, gameFont, rectRestart, Color.LightCyan, flags);
-                } else if (levelComplete && currentLevel < 6) { // Ensure this doesn't overlap with final message for L6 complete
-                     string continueMsg = "Press Enter to Proceed to Next Memory.";
-                     Rectangle rectContinue = new Rectangle(0, (int)(this.ClientSize.Height * 2/3f) -30 , this.ClientSize.Width, 60);
-                     TextRenderer.DrawText(g, continueMsg, gameFont, rectContinue, Color.LightGreen, flags);
-                } else if (currentLevel == 6 && levelComplete){ // Specific message for completing level 6
-                     string endMsg = "The final memory piece is fragile but preserved...\nPress Enter to see the outcome.";
-                     Rectangle rectEnd = new Rectangle(0, (int)(this.ClientSize.Height * 2/3f) -30 , this.ClientSize.Width, 80);
-                     TextRenderer.DrawText(g, endMsg, gameFont, rectEnd, Color.Gold, flags);
-                }
-            }
-            else if (currentLevel == 1 && !levelComplete) // Show small top instruction for Level 1 if active and not complete
-            {
-                 TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.WordBreak;
-                 Rectangle rectInstruction = new Rectangle(this.ClientSize.Width / 4, 30, this.ClientSize.Width / 2, 60); // Moved down a bit
-                 // Use the gameMessage which is already set for Level 1
-                 TextRenderer.DrawText(g, gameMessage, gameFont, rectInstruction, Color.Aqua, flags);
-            }
-            // Level 6 specific drawing
             if (currentLevel == 6)
             {
                 string condition = $"Flower Condition: {flower.State}";
                 SizeF conditionSize = g.MeasureString(condition, gameFont);
-                using (SolidBrush conditionBrush = new SolidBrush(flower.GetCurrentColor()))
-                {
+                using (SolidBrush conditionBrush = new SolidBrush(flower.GetCurrentColor())) {
                     g.DrawString(condition, gameFont, conditionBrush, this.ClientSize.Width - conditionSize.Width - 10, 10);
                 }
-                g.DrawString("Press 'S' to Save Screen (Mock)", smallFont, Brushes.LightGray, this.ClientSize.Width - 200, 10 + conditionSize.Height + 5);
+                g.DrawString("Press 'Space' to Save Screen (Mock)", smallFont, Brushes.LightGray, this.ClientSize.Width - 200, 10 + conditionSize.Height + 5);
             }
-        }
-
-
-        private void GameForm_KeyDown(object sender, KeyEventArgs e)
-        {
-            // Add to pressedKeys for continuous movement, handled in UpdateGame
-            if (!pressedKeys.Contains(e.KeyCode)) // Avoid redundant additions if already pressed
-                 pressedKeys.Add(e.KeyCode);
-
-
-            if (gameOver)
-            {
-                if (e.KeyCode == Keys.Enter) { if(currentLevel < 7) InitializeGame(); }
-                else if (e.KeyCode == Keys.Escape) { this.Close(); }
-                return;
-            }
-
-            if (levelComplete)
-            {
-                if (e.KeyCode == Keys.Enter) { currentLevel++; InitializeGame(); }
-                return;
-            }
-
-            // Level 1: Water and Fertilize Actions (REVISION 1: New Keys E/R)
-            if (currentLevel == 1 && (DateTime.Now - lastPlayerCareActionTime) > playerCareActionCooldown)
-            {
-                RectangleF interactionBounds = flower.Bounds;
-                interactionBounds.Inflate(player.Size.Width, player.Size.Height);
-
-                if (player.Bounds.IntersectsWith(interactionBounds))
-                {
-                    if (e.KeyCode == Keys.E) // Water (WAS 'W')
-                    {
-                        if (waterProgress < waterGoal) { waterProgress++; temporaryFeedbackMessage = "Watered!"; }
-                        else { temporaryFeedbackMessage = "Flower has enough water."; }
-                        lastPlayerCareActionTime = DateTime.Now;
-                        feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5);
+            // Debug drawing for collection zone
+            if (currentLevel >= 2 && currentLevel <= 4 && currentScreenState == GameScreenState.Playing) {
+                using (Pen playerPen = new Pen(Color.FromArgb(100, Color.LightGreen), 1)) {
+                    if(player != null) g.DrawRectangle(playerPen, Rectangle.Round(player.Bounds));
+                }
+                if(player != null) {
+                    RectangleF cz = player.Bounds;
+                    cz.Inflate(player.Size.Width * inflation, player.Size.Height * inflation);
+                    using (Pen zonePen = new Pen(Color.FromArgb(150, Color.Yellow), 2)) {
+                        RectangleF clippedCz = RectangleF.Intersect(cz, this.ClientRectangle);
+                        if(!clippedCz.IsEmpty) g.DrawRectangle(zonePen, Rectangle.Round(clippedCz));
                     }
-                    else if (e.KeyCode == Keys.R) // Fertilize (WAS 'F')
-                    {
-                         if (fertilizerProgress < fertilizerGoal) { fertilizerProgress++; temporaryFeedbackMessage = "Fertilized!"; }
-                         else { temporaryFeedbackMessage = "Flower has enough fertilizer."; }
-                        lastPlayerCareActionTime = DateTime.Now;
-                        feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5);
-                    } else if (e.KeyCode == Keys.Q) { currentLevel++; InitializeGame(); } // DEBUG, REMOVE LATER
+                }
+                foreach (var collectible in activeCollectibles) {
+                    using (Pen collectiblePen = new Pen(Color.FromArgb(150, Color.Cyan), 1)) {
+                        g.DrawRectangle(collectiblePen, Rectangle.Round(collectible.Bounds));
+                    }
                 }
             }
-            
-            if (currentLevel == 6 && e.KeyCode == Keys.S) {  MessageBox.Show("Screenshot 'saved'! (This is a placeholder)", "A Piece of Memory - Save", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+        }
+        
+        private void DrawOverlayMessage(Graphics g, string messageToDisplay) {
+            using (SolidBrush overlayBrush = new SolidBrush(Color.FromArgb(200, 0, 0, 0))) { g.FillRectangle(overlayBrush, 0, ClientSize.Height / 3.5f, ClientSize.Width, ClientSize.Height / 2.5f); }
+            TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak;
+            Rectangle rectMessage = new Rectangle(0, (int)(ClientSize.Height / 3.5f), ClientSize.Width, (int)(ClientSize.Height / 2.5f));
+            TextRenderer.DrawText(g, messageToDisplay, titleFont, rectMessage, Color.White, flags);
+            string prompt = "";
+            if (currentScreenState == GameScreenState.LevelTransition && currentLevel < 6) prompt = "Press Enter to Proceed.";
+            else if (currentScreenState == GameScreenState.LevelTransition && currentLevel == 6) prompt = "Final memory preserved...\nPress Enter.";
+            else if (currentScreenState == GameScreenState.GameOver) prompt = "Press Enter to Return to Start Screen or Escape to Quit.";
+            if (!string.IsNullOrEmpty(prompt)) { Rectangle rectPrompt = new Rectangle(0, (int)(rectMessage.Bottom - 70), ClientSize.Width, 60); TextRenderer.DrawText(g, prompt, gameFont, rectPrompt, Color.LightYellow, flags); }
         }
 
-        private void GameForm_KeyUp(object sender, KeyEventArgs e)
-        {
-            pressedKeys.Remove(e.KeyCode);
+        private void GameForm_Paint(object sender, PaintEventArgs e) {
+            Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.Clear(this.BackColor); 
+            switch (currentScreenState) {
+                case GameScreenState.Playing: DrawGamePlayingState(g); break;
+                case GameScreenState.LevelTransition: DrawGamePlayingState(g); DrawOverlayMessage(g, gameMessage); break;
+                case GameScreenState.GameOver: DrawGamePlayingState(g); DrawOverlayMessage(g, gameMessage); break;
+            }
         }
 
-        // ... (OnFormClosed - same as before) ...
-        protected override void OnFormClosed(FormClosedEventArgs e)
-        {
-            base.OnFormClosed(e);
-            gameTimer?.Stop();
-            gameTimer?.Dispose();
-            gameFont?.Dispose();
-            titleFont?.Dispose();
-            smallFont?.Dispose();
-            objectiveFont?.Dispose();
+        private void GameForm_KeyDown(object sender, KeyEventArgs e) {
+            switch (currentScreenState) {
+                case GameScreenState.Playing:
+                    if (!pressedKeys.Contains(e.KeyCode)) pressedKeys.Add(e.KeyCode);
+                    if (player == null) return;
+                    if (currentLevel == 1 && (DateTime.Now - lastPlayerCareActionTime) > playerCareActionCooldown) {
+                        RectangleF iBounds = flower.Bounds; iBounds.Inflate(player.Size.Width * 0.75f, player.Size.Height * 0.75f);
+                        if (player.Bounds.IntersectsWith(iBounds)) {
+                            if (e.KeyCode == Keys.E) { if (waterProgress < waterGoal) waterProgress++; temporaryFeedbackMessage = (waterProgress<waterGoal)?"Watered!":"Flower has enough water."; lastPlayerCareActionTime = DateTime.Now; feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5); }
+                            else if (e.KeyCode == Keys.R) { if (fertilizerProgress < fertilizerGoal) fertilizerProgress++; temporaryFeedbackMessage = (fertilizerProgress<fertilizerGoal)?"Fertilized!":"Flower has enough fertilizer."; lastPlayerCareActionTime = DateTime.Now; feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5); }
+                        }
+                    }
+                    if (currentLevel == 6 && e.KeyCode == Keys.S) { MessageBox.Show("Screenshot 'saved'! (Placeholder)", "A Piece of Memory", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+                    if (e.KeyCode == Keys.Q) { currentLevel++; if (currentLevel > 6) { HandleGameOver("DEBUG: All levels skipped."); } else { StartGameplayLevel(currentLevel); } }
+                    break;
+                case GameScreenState.LevelTransition:
+                    if (e.KeyCode == Keys.Enter) {
+                        currentLevel++;
+                        if (currentLevel > 6) { HandleGameOver("You've pieced together all the memories.\nThank you for playing."); }
+                        else { StartGameplayLevel(currentLevel); }
+                    }
+                    break;
+                case GameScreenState.GameOver:
+                    if (e.KeyCode == Keys.Enter) { InitializeAndStartGame(); }
+                    else if (e.KeyCode == Keys.Escape) { this.Close(); }
+                    break;
+            }
+        }
+        
+        private void GameForm_KeyUp(object sender, KeyEventArgs e) { pressedKeys.Remove(e.KeyCode); }
+        
+        private void GameForm_FormClosed(object sender, FormClosedEventArgs e) {
+            Application.Exit(); 
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e) { 
+            base.OnFormClosed(e); 
+            gameTimer?.Stop(); gameTimer?.Dispose();
+            gameFont?.Dispose(); titleFont?.Dispose(); smallFont?.Dispose(); objectiveFont?.Dispose();
         }
     }
 }
