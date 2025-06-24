@@ -1,5 +1,4 @@
-﻿// Collectible.cs
-using System; // Required for DateTime and TimeSpan
+﻿using System; // Required for DateTime and TimeSpan
 using System.Drawing;
 
 namespace APieceOfMemory

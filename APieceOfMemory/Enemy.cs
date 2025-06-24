@@ -2,7 +2,7 @@
 
 namespace APieceOfMemory
 {
-    public enum EnemyType { Slow, Fast, Faster } // Make sure this enum is accessible
+    public enum EnemyType { Slow, Fast, Faster }
 
     public class Enemy
     {
@@ -15,10 +15,7 @@ namespace APieceOfMemory
 
         public RectangleF Bounds => new RectangleF(Position, Size);
 
-        // Sprite placeholder:
-        public Image EnemySprite { get; set; }
-
-        public Enemy(float x, float y, int baseSize, EnemyType type, int initialHealth = 1)
+        public Enemy(float x, float y, Image sprite, EnemyType type, int initialHealth = 1)
         {
             Position = new PointF(x, y);
             Type = type;
@@ -28,23 +25,23 @@ namespace APieceOfMemory
             switch (type)
             {
                 case EnemyType.Slow:
-                    Size = new Size(baseSize, baseSize);
+                    Size = new Size(sprite.Size.Width - 150, sprite.Size.Height - 150);
                     Color = Color.FromArgb(220, 20, 60); // Crimson
                     // baseSpeedMagnitude = 1.5f;
                     baseSpeedMagnitude = 1.5f;
                     break;
                 case EnemyType.Fast:
-                    Size = new Size(baseSize - 2, baseSize - 2); 
+                    Size = new Size(sprite.Size.Width - 140, sprite.Size.Height - 140); 
                     Color = Color.FromArgb(255, 140, 0); // DarkOrange
                     baseSpeedMagnitude = 2.5f;
                     break;
                 case EnemyType.Faster:
-                    Size = new Size(baseSize - 4, baseSize - 4); 
+                    Size = new Size(sprite.Size.Width - 130, sprite.Size.Height - 130); 
                     Color = Color.FromArgb(255, 215, 0); // Gold
                     baseSpeedMagnitude = 3.5f;
                     break;
                 default:
-                    Size = new Size(baseSize, baseSize);
+                    Size = new Size(sprite.Size.Width, sprite.Size.Height);
                     Color = Color.Gray;
                     baseSpeedMagnitude = 1.0f;
                     break;
@@ -59,9 +56,14 @@ namespace APieceOfMemory
 
         public void Draw(Graphics g)
         {
-            if (EnemySprite != null) {
-                g.DrawImage(EnemySprite, Bounds);
-            } else {
+            Image spriteToUse = AnimatedSpriteManager.EnemySprite?.CurrentFrameImage;
+
+            if (spriteToUse != null)
+            {
+                g.DrawImage(spriteToUse, Bounds);
+            }
+            else
+            {
                 using (SolidBrush brush = new SolidBrush(this.Color))
                 {
                     g.FillRectangle(brush, this.Bounds);

@@ -1,5 +1,4 @@
-﻿// Boss.cs
-using System;
+﻿using System;
 using System.Drawing;
 
 namespace APieceOfMemory
@@ -25,23 +24,23 @@ namespace APieceOfMemory
 
         public Boss(float x, float y, int size, Color color, float speed, int health, float clientWidth, float clientHeight)
         {
-            Position = new PointF(x, y); // Initial position (off-screen right)
+            Position = new PointF(x, y); 
             Size = new Size(size, size);
             Color = color;
-            BaseSpeed = speed; // Speed for entering the screen
+            BaseSpeed = speed; 
             MaxHealth = health;
             Health = health;
             
             this.randomGen = new Random();
-            this.entryTargetX = clientWidth * 0.75f; // Boss will stop at 75% of screen width
+            this.entryTargetX = clientWidth * 0.75f; 
             this.hasEntered = false;
             
-            this.screenMinY = clientHeight * 0.1f; // Top boundary for vertical movement
-            this.screenMaxY = clientHeight * 0.9f - Size.Height; // Bottom boundary
+            this.screenMinY = clientHeight * 0.1f; 
+            this.screenMaxY = clientHeight * 0.9f - Size.Height; 
 
-            this.verticalTargetY = y; // Initial vertical target can be its spawn Y
-            this.verticalMoveSpeed = BaseSpeed * 0.5f; // Slower, smoother vertical movement
-            SetNewVerticalTarget(); // Set an initial random target
+            this.verticalTargetY = y;
+            this.verticalMoveSpeed = BaseSpeed * 0.5f; 
+            SetNewVerticalTarget(); 
         }
 
         private void SetNewVerticalTarget()
@@ -49,20 +48,19 @@ namespace APieceOfMemory
             verticalTargetY = randomGen.Next((int)screenMinY, (int)screenMaxY);
         }
 
-        public void Update(float clientWidth, float clientHeight) // clientWidth not used after entry
+        public void Update(float clientWidth, float clientHeight)
         {
             if (!hasEntered)
             {
-                // Move left to enter the screen
                 Position = new PointF(Position.X - BaseSpeed, Position.Y);
                 if (Position.X <= entryTargetX)
                 {
                     Position = new PointF(entryTargetX, Position.Y); // Snap to final X position
                     hasEntered = true;
-                    SetNewVerticalTarget(); // Set first random vertical target
+                    SetNewVerticalTarget();
                 }
             }
-            else // Boss has entered, perform random vertical movement
+            else
             {
                 if (Math.Abs(Position.Y - verticalTargetY) < verticalMoveSpeed)
                 {
@@ -78,41 +76,49 @@ namespace APieceOfMemory
                     Position = new PointF(Position.X, Position.Y - verticalMoveSpeed);
                 }
 
-                // Clamp Y position to screen bounds (already considered by target, but good for safety)
                 Position = new PointF(Position.X, Math.Max(screenMinY, Math.Min(Position.Y, screenMaxY)));
             }
         }
 
         public void Draw(Graphics g)
         {
-            using (SolidBrush brush = new SolidBrush(Color))
-            {
-                g.FillEllipse(brush, Bounds);
-            }
+            Image spriteToUse = AnimatedSpriteManager.BossSprite?.CurrentFrameImage;
 
-            // Draw Health Bar (same as before)
-            float healthBarWidth = Size.Width;
-            float healthBarHeight = 10;
-            float healthBarX = Position.X;
-            float healthBarY = Position.Y - healthBarHeight - 5;
-            if (healthBarY < 0) healthBarY = Position.Y + Size.Height + 5; // Draw below if no space above
-
-            float currentHealthWidth = healthBarWidth * ((float)Health / MaxHealth);
-            if (currentHealthWidth < 0) currentHealthWidth = 0;
-
-
-            using (SolidBrush backBrush = new SolidBrush(Color.FromArgb(150, Color.DarkRed)))
+            if (spriteToUse != null)
             {
-                 g.FillRectangle(backBrush, healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+                g.DrawImage(spriteToUse, Bounds);
             }
-            using (SolidBrush frontBrush = new SolidBrush(Color.FromArgb(200, Color.LimeGreen)))
+            else
             {
-                g.FillRectangle(frontBrush, healthBarX, healthBarY, currentHealthWidth, healthBarHeight);
+                using (SolidBrush brush = new SolidBrush(Color))
+                {
+                    g.FillEllipse(brush, Bounds);
+                }
+
+                float healthBarWidth = Size.Width;
+                float healthBarHeight = 10;
+                float healthBarX = Position.X;
+                float healthBarY = Position.Y - healthBarHeight - 5;
+                if (healthBarY < 0) healthBarY = Position.Y + Size.Height + 5;
+
+                float currentHealthWidth = healthBarWidth * ((float)Health / MaxHealth);
+                if (currentHealthWidth < 0) currentHealthWidth = 0;
+
+
+                using (SolidBrush backBrush = new SolidBrush(Color.FromArgb(150, Color.DarkRed)))
+                {
+                    g.FillRectangle(backBrush, healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+                }
+                using (SolidBrush frontBrush = new SolidBrush(Color.FromArgb(200, Color.LimeGreen)))
+                {
+                    g.FillRectangle(frontBrush, healthBarX, healthBarY, currentHealthWidth, healthBarHeight);
+                }
+                using (Pen borderPen = new Pen(Color.FromArgb(180, Color.White)))
+                {
+                    g.DrawRectangle(borderPen, healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+                }
             }
-            using (Pen borderPen = new Pen(Color.FromArgb(180, Color.White)))
-            {
-                 g.DrawRectangle(borderPen, healthBarX, healthBarY, healthBarWidth, healthBarHeight);
-            }
+            
         }
     }
 }

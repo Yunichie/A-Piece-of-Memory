@@ -5,7 +5,6 @@ using System.Windows.Forms;
 
 namespace APieceOfMemory 
 {
-    // Start Screen Form
     public partial class StartScreen : Form
     {
         private System.Windows.Forms.Timer animationTimer;
@@ -18,13 +17,12 @@ namespace APieceOfMemory
         {
             InitializeComponent();
             SetupStartScreen();
+            AnimatedSpriteManager.LoadSprites();
         }
         private new void InitializeComponent()
         {
             this.SuspendLayout();
-            // 
-            // StartScreen
-            // 
+            
             this.ClientSize = new System.Drawing.Size(784, 561);
             this.Name = "StartScreen";
             this.Size = new Size(800, 600);
@@ -112,7 +110,6 @@ namespace APieceOfMemory
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
-            // Draw floating particles (simple version)
             var particleRandom = new Random(123);
             for (int i = 0; i < 30; i++)
             {
@@ -163,6 +160,7 @@ namespace APieceOfMemory
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
+            AnimatedSpriteManager.DisposeSprites();
             base.OnFormClosed(e);
             if (Application.OpenForms.Count == 0)
             {

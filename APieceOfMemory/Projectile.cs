@@ -1,9 +1,8 @@
-﻿// Projectile.cs
-using System.Drawing;
+﻿using System.Drawing;
 
 namespace APieceOfMemory
 {
-    public enum ProjectileType { Player, Enemy } // Assuming this is already defined
+    public enum ProjectileType { Player, Enemy } 
 
     public class Projectile
     {
@@ -15,9 +14,6 @@ namespace APieceOfMemory
 
         public RectangleF Bounds => new RectangleF(Position, Size);
 
-        // Sprite placeholder:
-        public Image ProjectileSprite { get; set; }
-
         public Projectile(float x, float y, int size, Color color, PointF velocity, ProjectileType type)
         {
             Position = new PointF(x, y);
@@ -27,7 +23,6 @@ namespace APieceOfMemory
             Type = type;
         }
 
-        // MODIFIED Update method
         public bool Update(Rectangle clientBounds)
         {
             Position = new PointF(Position.X + Velocity.X, Position.Y + Velocity.Y);
@@ -36,20 +31,16 @@ namespace APieceOfMemory
             if (Position.X < -Size.Width || Position.X > clientBounds.Width ||
                 Position.Y < -Size.Height || Position.Y > clientBounds.Height)
             {
-                return false; // Should be removed
+                return false;
             }
-            return true; // Still active
+            return true; 
         }
 
         public void Draw(Graphics g)
         {
-            if (ProjectileSprite != null) {
-                g.DrawImage(ProjectileSprite, Bounds);
-            } else {
-                using (SolidBrush brush = new SolidBrush(Color))
-                {
-                    g.FillEllipse(brush, Bounds); 
-                }
+            using (SolidBrush brush = new SolidBrush(Color))
+            {
+                g.FillEllipse(brush, Bounds); 
             }
         }
     }

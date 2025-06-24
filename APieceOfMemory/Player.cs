@@ -12,13 +12,10 @@ namespace APieceOfMemory
 
         public RectangleF Bounds => new RectangleF(Position, Size);
 
-        // Sprite placeholder:
-        public Image PlayerSprite { get; set; }
-
-        public Player(float x, float y, int size, Color color, int speed)
+        public Player(float x, float y, Image sprite, Color color, int speed)
         {
             Position = new PointF(x, y);
-            Size = new Size(size, size);
+            Size = new Size(sprite.Size.Width - 50, sprite.Size.Height - 50);
             Color = color;
             Speed = speed;
             CanMoveFreely = false;
@@ -39,8 +36,10 @@ namespace APieceOfMemory
 
         public void Draw(Graphics g)
         {
-            if (PlayerSprite != null) {
-                g.DrawImage(PlayerSprite, Bounds);
+            Image SpriteToUse = AnimatedSpriteManager.PlayerSprite?.CurrentFrameImage;
+            
+            if (SpriteToUse != null) {
+                g.DrawImage(SpriteToUse, Bounds);
             } else {
                 using (SolidBrush brush = new SolidBrush(Color))
                 {

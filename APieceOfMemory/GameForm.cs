@@ -85,8 +85,10 @@ namespace APieceOfMemory
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(15, 15, 30); // Darker blue
+            // this.BackColor = Color.FromArgb(15, 15, 30); // Darker blue
             this.DoubleBuffered = true;
+            this.BackgroundImage = Image.FromFile(Path.Combine(Application.StartupPath, "Resources", "Space_Background.png"));
+            this.BackgroundImageLayout = ImageLayout.Center;
 
             this.Paint += GameForm_Paint;
             this.KeyDown += GameForm_KeyDown;
@@ -121,7 +123,8 @@ namespace APieceOfMemory
             currentLevel = levelNumber;
             currentScreenState = GameScreenState.Playing;
 
-            player = new Player(this.ClientSize.Width / 2f - PlayerSize / 2f, this.ClientSize.Height - PlayerSize - 50, PlayerSize, Color.Cyan, PlayerSpeed);
+            // player = new Player(this.ClientSize.Width / 2f - PlayerSize / 2f, this.ClientSize.Height - PlayerSize - 50, PlayerSize, Color.Cyan, PlayerSpeed);
+            player = new Player(this.ClientSize.Width / 2f - PlayerSize / 2f, this.ClientSize.Height - PlayerSize - 50, AnimatedSpriteManager.PlayerSprite?.CurrentFrameImage, Color.Cyan, PlayerSpeed);
             flower = new Flower(30, this.ClientSize.Height / 2f - FlowerPotSize / 2f, FlowerPotSize); // Flower resets each level start
             
             enemies = new List<Enemy>();
@@ -210,7 +213,7 @@ namespace APieceOfMemory
                     spawnY = random.Next(EnemyBaseSize, (int)(this.ClientSize.Height * 0.85f));
                 spawnY = Math.Max(EnemyBaseSize, Math.Min(this.ClientSize.Height - EnemyBaseSize * 2, spawnY));
                 float spawnX = this.ClientSize.Width + 30 + (i * (EnemyBaseSize + 35));
-                Enemy newEnemy = new Enemy(spawnX, spawnY, EnemyBaseSize, type);
+                Enemy newEnemy = new Enemy(spawnX, spawnY, AnimatedSpriteManager.EnemySprite?.CurrentFrameImage, type);
                 newEnemy.Speed = -Math.Abs(newEnemy.Speed); 
                 enemies.Add(newEnemy);
             }
@@ -267,7 +270,7 @@ namespace APieceOfMemory
                 spawnY = Math.Max(EnemyBaseSize, Math.Min(this.ClientSize.Height - EnemyBaseSize*2, spawnY)); float spawnX;
                 if (currentLevel >= 2 && currentLevel <= 4) { spawnX = this.ClientSize.Width + random.Next(20, 120); } 
                 else { spawnX = (random.Next(0,2) == 0) ? -EnemyBaseSize - random.Next(20,100) : this.ClientSize.Width + random.Next(20,150); }
-                Enemy newEnemy = new Enemy(spawnX, spawnY, EnemyBaseSize, typeToSpawn);
+                Enemy newEnemy = new Enemy(spawnX, spawnY, AnimatedSpriteManager.EnemySprite?.CurrentFrameImage, typeToSpawn);
                 PointF targetForEnemy = (currentLevel >= 2 && currentLevel <= 4 && player != null) ? player.Position : flower.Position;
                 if (spawnX > targetForEnemy.X) newEnemy.Speed = -Math.Abs(newEnemy.Speed); else newEnemy.Speed = Math.Abs(newEnemy.Speed);
                 enemies.Add(newEnemy); lastEnemySpawnTime = DateTime.Now;
@@ -521,7 +524,8 @@ namespace APieceOfMemory
         }
 
         private void GameForm_Paint(object sender, PaintEventArgs e) {
-            Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.Clear(this.BackColor); 
+            Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; 
+            // g.Clear(this.BackColor); 
             switch (currentScreenState) {
                 case GameScreenState.Playing: DrawGamePlayingState(g); break;
                 case GameScreenState.LevelTransition: DrawGamePlayingState(g); DrawOverlayMessage(g, gameMessage); break;
