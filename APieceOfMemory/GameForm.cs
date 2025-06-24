@@ -145,8 +145,8 @@ namespace APieceOfMemory
 
         private void SetupLevelSpecifics(int level)
         {
-            player.CanMoveFreely = (level == 1 || level == 6 || level == 5);
-            if (level >= 2 && level <= 4) { 
+            player.CanMoveFreely = (level == 5);
+            if (level >= 1 && level <= 4) { 
                 player.CanMoveFreely = false;
                 player.Position = new PointF(flower.Bounds.Right + 15, flower.Bounds.Top + flower.Size.Height / 2f - player.Size.Height / 2f);
             } else if (level == 5) { 
@@ -162,13 +162,14 @@ namespace APieceOfMemory
             
             switch (level)
             {
-                case 1:
-                    waterGoal = 7; fertilizerGoal = 5;
-                    flower.State = FlowerState.Healthy; 
-                    enemySpawnInterval = TimeSpan.FromSeconds(9999);
-                    lastEnemySpawnTime = DateTime.Now;
-                    break;
-                case 2: case 3: case 4:
+                // case 1:
+                //     waterGoal = 7; fertilizerGoal = 5;
+                //     flower.State = FlowerState.Healthy; 
+                //     enemySpawnInterval = TimeSpan.FromSeconds(9999);
+                //     lastEnemySpawnTime = DateTime.Now;
+                //     break;
+                case 1: case 2: case 3: case 4:
+                    if (level == 1) { waterGoal = 3; fertilizerGoal = 2; enemySpawnInterval = TimeSpan.FromSeconds(2.0); }
                     if (level == 2) { waterGoal = 5; fertilizerGoal = 3; enemySpawnInterval = TimeSpan.FromSeconds(1.5); } 
                     if (level == 3) { waterGoal = 8; fertilizerGoal = 5; enemySpawnInterval = TimeSpan.FromSeconds(1.0); }
                     if (level == 4) { waterGoal = 12; fertilizerGoal = 8; enemySpawnInterval = TimeSpan.FromSeconds(0.7); } // Faster
@@ -184,13 +185,13 @@ namespace APieceOfMemory
                     lastBossSpecialAttackTime = DateTime.Now.AddSeconds(-bossSpecialAttackInterval.TotalSeconds + 5);
                     isBossPerformingSpecialAttack = false;
                     break;
-                case 6:
-                    waterGoal = 0; fertilizerGoal = 0;
-                    flower.State = FlowerState.Broken; 
-                    enemySpawnInterval = TimeSpan.FromSeconds(1.5); 
-                    if (!enemies.Any()) SpawnInitialEnemiesForLevel(6); 
-                    lastEnemySpawnTime = DateTime.Now.AddSeconds(-enemySpawnInterval.TotalSeconds + 1.0);
-                    break;
+                // case 6:
+                //     waterGoal = 0; fertilizerGoal = 0;
+                //     flower.State = FlowerState.Broken; 
+                //     enemySpawnInterval = TimeSpan.FromSeconds(1.5); 
+                //     if (!enemies.Any()) SpawnInitialEnemiesForLevel(6); 
+                //     lastEnemySpawnTime = DateTime.Now.AddSeconds(-enemySpawnInterval.TotalSeconds + 1.0);
+                //     break;
                 default: 
                     HandleGameOver($"You've pieced together all the memories.\nThanks for playing!");
                     break;
@@ -200,14 +201,19 @@ namespace APieceOfMemory
         private void SpawnInitialEnemiesForLevel(int gameLevel)
         {
             int count = 0; EnemyType type = EnemyType.Slow;
-            if (gameLevel == 2) { count = 3; type = EnemyType.Slow; }
+            if (gameLevel == 1)
+            {
+                count = 2;
+                type = EnemyType.Slow;
+            }
+            else if (gameLevel == 2) { count = 3; type = EnemyType.Slow; }
             else if (gameLevel == 3) { count = 3; type = EnemyType.Fast; } 
             else if (gameLevel == 4) { count = 4; type = EnemyType.Faster; }
             else if (gameLevel == 6) { count = 4; type = EnemyType.Slow;}
 
             for (int i = 0; i < count; i++) {
                 float spawnY;
-                 if (gameLevel >= 2 && gameLevel <= 4 && player != null) 
+                 if (gameLevel >= 1 && gameLevel <= 4 && player != null) 
                     spawnY = player.Position.Y + random.Next(-(int)(player.Size.Height*1.5), (int)(player.Size.Height*1.5));
                  else 
                     spawnY = random.Next(EnemyBaseSize, (int)(this.ClientSize.Height * 0.85f));
@@ -236,7 +242,7 @@ namespace APieceOfMemory
 
             // Player Movement
             float dx = 0; float dy = 0;
-            if (!(currentLevel >= 2 && currentLevel <= 4)) 
+            if (!(currentLevel >= 1 && currentLevel <= 4)) 
             {
                 if (currentLevel != 5) 
                 {
@@ -257,28 +263,28 @@ namespace APieceOfMemory
             for (int i = activeCollectibles.Count - 1; i >= 0; i--) { activeCollectibles[i].Update(); if (activeCollectibles[i].IsExpired) activeCollectibles.RemoveAt(i); }
 
             // Timed Enemy Spawning
-            if ((currentLevel >= 2 && currentLevel <= 4 || currentLevel == 6) &&
+            if ((currentLevel >= 1 && currentLevel <= 4) &&
                 (DateTime.Now - lastEnemySpawnTime) > enemySpawnInterval &&
                  enemies.Count < (currentLevel == 4 ? 12 : currentLevel == 6 ? 10 : 8)) // Adjusted max enemies 
             {
                 EnemyType typeToSpawn = currentLevel switch {
-                    2 => EnemyType.Slow, 3 => EnemyType.Fast, 4 => EnemyType.Faster, 6 => EnemyType.Slow, _ => EnemyType.Slow
+                    1 => EnemyType.Slow, 2 => EnemyType.Slow, 3 => EnemyType.Fast, 4 => EnemyType.Faster, _ => EnemyType.Slow
                 };
                 float spawnY;
-                if ((currentLevel >= 2 && currentLevel <= 4) && player != null) { spawnY = player.Position.Y + random.Next(-player.Size.Height*2, player.Size.Height*2); } 
+                if ((currentLevel >= 1 && currentLevel <= 4) && player != null) { spawnY = player.Position.Y + random.Next(-player.Size.Height*2, player.Size.Height*2); } 
                 else { spawnY = random.Next(EnemyBaseSize, this.ClientSize.Height - EnemyBaseSize); }
                 spawnY = Math.Max(EnemyBaseSize, Math.Min(this.ClientSize.Height - EnemyBaseSize*2, spawnY)); float spawnX;
-                if (currentLevel >= 2 && currentLevel <= 4) { spawnX = this.ClientSize.Width + random.Next(20, 120); } 
+                if (currentLevel >= 1 && currentLevel <= 4) { spawnX = this.ClientSize.Width + random.Next(20, 120); } 
                 else { spawnX = (random.Next(0,2) == 0) ? -EnemyBaseSize - random.Next(20,100) : this.ClientSize.Width + random.Next(20,150); }
                 Enemy newEnemy = new Enemy(spawnX, spawnY, AnimatedSpriteManager.EnemySprite?.CurrentFrameImage, typeToSpawn);
-                PointF targetForEnemy = (currentLevel >= 2 && currentLevel <= 4 && player != null) ? player.Position : flower.Position;
+                PointF targetForEnemy = (currentLevel >= 1 && currentLevel <= 4 && player != null) ? player.Position : flower.Position;
                 if (spawnX > targetForEnemy.X) newEnemy.Speed = -Math.Abs(newEnemy.Speed); else newEnemy.Speed = Math.Abs(newEnemy.Speed);
                 enemies.Add(newEnemy); lastEnemySpawnTime = DateTime.Now;
             }
 
             // Enemy Updates
             for (int i = enemies.Count - 1; i >= 0; i--) {
-                PointF targetPos = (currentLevel >=2 && currentLevel <=4 && player != null) ? player.Position : flower.Position;
+                PointF targetPos = (currentLevel >= 1 && currentLevel <= 4 && player != null) ? player.Position : flower.Position;
                 enemies[i].Update(targetPos); 
                 if (enemies[i].Bounds.IntersectsWith(flower.Bounds)) {
                     flower.TakeDamage(); enemies.RemoveAt(i);
@@ -347,7 +353,7 @@ namespace APieceOfMemory
         private void GameForm_MouseClick(object sender, MouseEventArgs e) {
             if (e.Button == MouseButtons.Left) {
                 if (currentScreenState == GameScreenState.Playing) {
-                    if (currentLevel == 1 && !enemies.Any()) return; 
+                    // if (currentLevel == 1 && !enemies.Any()) return; 
                     if ((DateTime.Now - lastPlayerShootTime) > playerShootCooldown && player != null) {
                         PointF playerCenter = new PointF(player.Position.X + player.Size.Width / 2f, player.Position.Y + player.Size.Height / 2f);
                         float dirX = e.X - playerCenter.X; float dirY = e.Y - playerCenter.Y; float length = (float)Math.Sqrt(dirX * dirX + dirY * dirY);
@@ -369,7 +375,7 @@ namespace APieceOfMemory
                     if (i < playerProjectiles.Count && playerProjectiles[i].Bounds.IntersectsWith(enemies[j].Bounds)) { // Check i validity
                         enemies[j].Health--;
                         if (enemies[j].Health <= 0) {
-                            if (currentLevel >= 2 && currentLevel <= 4 && random.NextDouble() < COLLECTIBLE_DROP_CHANCE) {
+                            if (currentLevel >= 1 && currentLevel <= 4 && random.NextDouble() < COLLECTIBLE_DROP_CHANCE) {
                                 CollectibleType dropType = (random.Next(0, 2) == 0) ? CollectibleType.Water : CollectibleType.Fertilizer;
                                 activeCollectibles.Add(new Collectible(
                                     enemies[j].Position.X + enemies[j].Size.Width / 2f - Collectible.DefaultSize / 2f, 
@@ -395,7 +401,7 @@ namespace APieceOfMemory
                 }
             }
             // Player vs Collectibles
-            if (currentLevel >= 2 && currentLevel <= 4) {
+            if (currentLevel >= 1 && currentLevel <= 4) {
                 RectangleF collectionZone = player.Bounds; float actualInflation = player.Size.Width * inflation; collectionZone.Inflate(actualInflation, actualInflation); 
                 for (int k = activeCollectibles.Count - 1; k >= 0; k--) {
                     // Debug.WriteLine($"Checking collectible [{k}] Bounds: {activeCollectibles[k].Bounds} against Zone: {collectionZone}. Intersects: {collectionZone.IntersectsWith(activeCollectibles[k].Bounds)}");
@@ -446,17 +452,17 @@ namespace APieceOfMemory
             if (currentScreenState != GameScreenState.Playing) return;
             bool conditionsMet = false;
             switch (currentLevel) {
-                case 1: if (waterProgress >= waterGoal && fertilizerProgress >= fertilizerGoal) conditionsMet = true; break;
-                case 2: case 3: case 4: if (waterProgress >= waterGoal && fertilizerProgress >= fertilizerGoal) conditionsMet = true; break;
+                // case 1: if (waterProgress >= waterGoal && fertilizerProgress >= fertilizerGoal) conditionsMet = true; break;
+                case 1: case 2: case 3: case 4: if (waterProgress >= waterGoal && fertilizerProgress >= fertilizerGoal) conditionsMet = true; break;
                 case 5: if (boss == null) conditionsMet = true; break;
-                case 6: if (enemies.Count == 0 && !AnyEnemiesSpawningSoon() && flower.State != FlowerState.Dead) { /* conditionsMet = true; */ } break;
+                // case 6: if (enemies.Count == 0 && !AnyEnemiesSpawningSoon() && flower.State != FlowerState.Dead) { /* conditionsMet = true; */ } break;
             }
             if (conditionsMet) { currentScreenState = GameScreenState.LevelTransition; gameMessage = $"Level {currentLevel} Complete!"; temporaryFeedbackMessage = ""; }
         }
 
         private bool AnyEnemiesSpawningSoon()
         {
-            return (currentLevel >= 2 && currentLevel <= 4 || currentLevel == 6) && 
+            return (currentLevel >= 1 && currentLevel <= 4) && 
                    (DateTime.Now - lastEnemySpawnTime) <= enemySpawnInterval && 
                    enemies.Count < (currentLevel == 4 ? 12 : currentLevel == 6 ? 8 : 8) ; // Adjusted max enemies
         }
@@ -481,17 +487,17 @@ namespace APieceOfMemory
                 g.DrawString(temporaryFeedbackMessage, gameFont, Brushes.Lime, feedbackX, feedbackY);
             }
 
-            if (currentLevel == 6)
-            {
-                string condition = $"Flower Condition: {flower.State}";
-                SizeF conditionSize = g.MeasureString(condition, gameFont);
-                using (SolidBrush conditionBrush = new SolidBrush(flower.GetCurrentColor())) {
-                    g.DrawString(condition, gameFont, conditionBrush, this.ClientSize.Width - conditionSize.Width - 10, 10);
-                }
-                g.DrawString("Press 'Space' to Save Screen (Mock)", smallFont, Brushes.LightGray, this.ClientSize.Width - 200, 10 + conditionSize.Height + 5);
-            }
+            // if (currentLevel == 6)
+            // {
+            //     string condition = $"Flower Condition: {flower.State}";
+            //     SizeF conditionSize = g.MeasureString(condition, gameFont);
+            //     using (SolidBrush conditionBrush = new SolidBrush(flower.GetCurrentColor())) {
+            //         g.DrawString(condition, gameFont, conditionBrush, this.ClientSize.Width - conditionSize.Width - 10, 10);
+            //     }
+            //     g.DrawString("Press 'Space' to Save Screen (Mock)", smallFont, Brushes.LightGray, this.ClientSize.Width - 200, 10 + conditionSize.Height + 5);
+            // }
             // Debug drawing for collection zone
-            if (currentLevel >= 2 && currentLevel <= 4 && currentScreenState == GameScreenState.Playing) {
+            if (currentLevel >= 1 && currentLevel <= 4 && currentScreenState == GameScreenState.Playing) {
                 using (Pen playerPen = new Pen(Color.FromArgb(100, Color.LightGreen), 1)) {
                     if(player != null) g.DrawRectangle(playerPen, Rectangle.Round(player.Bounds));
                 }
@@ -538,20 +544,20 @@ namespace APieceOfMemory
                 case GameScreenState.Playing:
                     if (!pressedKeys.Contains(e.KeyCode)) pressedKeys.Add(e.KeyCode);
                     if (player == null) return;
-                    if (currentLevel == 1 && (DateTime.Now - lastPlayerCareActionTime) > playerCareActionCooldown) {
-                        RectangleF iBounds = flower.Bounds; iBounds.Inflate(player.Size.Width * 0.75f, player.Size.Height * 0.75f);
-                        if (player.Bounds.IntersectsWith(iBounds)) {
-                            if (e.KeyCode == Keys.E) { if (waterProgress < waterGoal) waterProgress++; temporaryFeedbackMessage = (waterProgress<waterGoal)?"Watered!":"Flower has enough water."; lastPlayerCareActionTime = DateTime.Now; feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5); }
-                            else if (e.KeyCode == Keys.R) { if (fertilizerProgress < fertilizerGoal) fertilizerProgress++; temporaryFeedbackMessage = (fertilizerProgress<fertilizerGoal)?"Fertilized!":"Flower has enough fertilizer."; lastPlayerCareActionTime = DateTime.Now; feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5); }
-                        }
-                    }
-                    if (currentLevel == 6 && e.KeyCode == Keys.S) { MessageBox.Show("Screenshot 'saved'! (Placeholder)", "A Piece of Memory", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+                    // if (currentLevel == 1 && (DateTime.Now - lastPlayerCareActionTime) > playerCareActionCooldown) {
+                    //     RectangleF iBounds = flower.Bounds; iBounds.Inflate(player.Size.Width * 0.75f, player.Size.Height * 0.75f);
+                    //     if (player.Bounds.IntersectsWith(iBounds)) {
+                    //         if (e.KeyCode == Keys.E) { if (waterProgress < waterGoal) waterProgress++; temporaryFeedbackMessage = (waterProgress<waterGoal)?"Watered!":"Flower has enough water."; lastPlayerCareActionTime = DateTime.Now; feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5); }
+                    //         else if (e.KeyCode == Keys.R) { if (fertilizerProgress < fertilizerGoal) fertilizerProgress++; temporaryFeedbackMessage = (fertilizerProgress<fertilizerGoal)?"Fertilized!":"Flower has enough fertilizer."; lastPlayerCareActionTime = DateTime.Now; feedbackMessageExpiry = DateTime.Now.AddSeconds(1.5); }
+                    //     }
+                    // }
+                    // if (currentLevel == 6 && e.KeyCode == Keys.S) { MessageBox.Show("Screenshot 'saved'! (Placeholder)", "A Piece of Memory", MessageBoxButtons.OK, MessageBoxIcon.Information); }
                     if (e.KeyCode == Keys.Q) { currentLevel++; if (currentLevel > 6) { HandleGameOver("DEBUG: All levels skipped."); } else { StartGameplayLevel(currentLevel); } }
                     break;
                 case GameScreenState.LevelTransition:
                     if (e.KeyCode == Keys.Enter) {
                         currentLevel++;
-                        if (currentLevel > 6) { HandleGameOver("You've pieced together all the memories.\nThank you for playing."); }
+                        if (currentLevel > 5) { HandleGameOver("You've pieced together all the memories.\nThank you for playing."); }
                         else { StartGameplayLevel(currentLevel); }
                     }
                     break;
