@@ -25,8 +25,8 @@ namespace APieceOfMemory
         public static readonly int DefaultSize = 18;
 
         // Sprite placeholder:
-        // public Image WaterSprite { get; set; }
-        // public Image FertilizerSprite { get; set; }
+        public Image WaterSprite { get; set; }
+        public Image FertilizerSprite { get; set; }
 
         public Collectible(float x, float y, CollectibleType type)
         {

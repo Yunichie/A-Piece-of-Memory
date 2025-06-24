@@ -16,7 +16,7 @@ namespace APieceOfMemory
         public RectangleF Bounds => new RectangleF(Position, Size);
 
         // Sprite placeholder:
-        // public Image EnemySprite { get; set; }
+        public Image EnemySprite { get; set; }
 
         public Enemy(float x, float y, int baseSize, EnemyType type, int initialHealth = 1)
         {
@@ -59,14 +59,14 @@ namespace APieceOfMemory
 
         public void Draw(Graphics g)
         {
-            // if (EnemySprite != null) {
-            //     g.DrawImage(EnemySprite, Bounds);
-            // } else {
-            using (SolidBrush brush = new SolidBrush(this.Color))
-            {
-                g.FillRectangle(brush, this.Bounds);
+            if (EnemySprite != null) {
+                g.DrawImage(EnemySprite, Bounds);
+            } else {
+                using (SolidBrush brush = new SolidBrush(this.Color))
+                {
+                    g.FillRectangle(brush, this.Bounds);
+                }
             }
-            // }
         }
     }
 }

@@ -16,7 +16,7 @@ namespace APieceOfMemory
         public RectangleF Bounds => new RectangleF(Position, Size);
 
         // Sprite placeholder:
-        // public Image ProjectileSprite { get; set; }
+        public Image ProjectileSprite { get; set; }
 
         public Projectile(float x, float y, int size, Color color, PointF velocity, ProjectileType type)
         {
@@ -43,14 +43,14 @@ namespace APieceOfMemory
 
         public void Draw(Graphics g)
         {
-            // if (ProjectileSprite != null) {
-            //     g.DrawImage(ProjectileSprite, Bounds);
-            // } else {
-            using (SolidBrush brush = new SolidBrush(Color))
-            {
-                g.FillEllipse(brush, Bounds); 
+            if (ProjectileSprite != null) {
+                g.DrawImage(ProjectileSprite, Bounds);
+            } else {
+                using (SolidBrush brush = new SolidBrush(Color))
+                {
+                    g.FillEllipse(brush, Bounds); 
+                }
             }
-            // }
         }
     }
 }

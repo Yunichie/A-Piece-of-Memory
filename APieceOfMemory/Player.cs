@@ -13,7 +13,7 @@ namespace APieceOfMemory
         public RectangleF Bounds => new RectangleF(Position, Size);
 
         // Sprite placeholder:
-        // public Image PlayerSprite { get; set; }
+        public Image PlayerSprite { get; set; }
 
         public Player(float x, float y, int size, Color color, int speed)
         {
@@ -39,14 +39,14 @@ namespace APieceOfMemory
 
         public void Draw(Graphics g)
         {
-            // if (PlayerSprite != null) {
-            //     g.DrawImage(PlayerSprite, Bounds);
-            // } else {
-            using (SolidBrush brush = new SolidBrush(Color))
-            {
-                g.FillEllipse(brush, Bounds);
+            if (PlayerSprite != null) {
+                g.DrawImage(PlayerSprite, Bounds);
+            } else {
+                using (SolidBrush brush = new SolidBrush(Color))
+                {
+                    g.FillEllipse(brush, Bounds);
+                }
             }
-            // }
         }
     }
 }
