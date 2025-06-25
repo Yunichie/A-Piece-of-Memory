@@ -77,6 +77,9 @@ namespace APieceOfMemory
         public static SpriteManager BackgroundImage { get; private set; }
         // Animated sprite properties
         public static SpriteManager PlayerSprite { get; private set; }
+        
+        public static SpriteManager PlayerShootingSprite { get; private set; }
+
         public static SpriteManager EnemySprite { get; private set; }
         
         public static SpriteManager FlowerSprite { get; private set; }
@@ -88,13 +91,14 @@ namespace APieceOfMemory
         {
             try
             {
-                BackgroundImage = LoadAnimatedSprite(Path.Combine(spritesPath, "Space_Background.png"));
-                PlayerSprite = LoadAnimatedSprite(Path.Combine(spritesPath, "sol.gif"));
-                EnemySprite = LoadAnimatedSprite(Path.Combine(spritesPath, "lava_world.gif"));
-                FlowerSprite = LoadAnimatedSprite(Path.Combine(spritesPath, "terra.gif"));
+                BackgroundImage = LoadAnimatedSprite(Path.Combine(spritesPath, "GameBackground.png"));
+                PlayerSprite = LoadAnimatedSprite(Path.Combine(spritesPath, "Player.gif"));
+                PlayerShootingSprite = LoadAnimatedSprite(Path.Combine(spritesPath, "PlayerShoot.gif"));
+                EnemySprite = LoadAnimatedSprite(Path.Combine(spritesPath, "Opps.gif"));
+                FlowerSprite = LoadAnimatedSprite(Path.Combine(spritesPath, "Flower.gif"));
                 // PlayerProjectileSprite = LoadAnimatedSprite(Path.Combine(spritesPath, "projectile_player.gif"));
                 // EnemyProjectileSprite = LoadAnimatedSprite(Path.Combine(spritesPath, "projectile_enemy.gif"));
-                BossSprite = LoadAnimatedSprite(Path.Combine(spritesPath, "black_hole.gif"));
+                BossSprite = LoadAnimatedSprite(Path.Combine(spritesPath, "Boss.gif"));
             }
             catch (Exception ex)
             {

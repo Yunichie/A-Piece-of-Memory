@@ -9,31 +9,41 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="Resources\" />
-    </ItemGroup>
-
-    <ItemGroup>
       <None Update="Resources\player.gif">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
       <None Update="Resources\player.png">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Resources\black_hole.gif">
+      <None Update="Resources\Boss.gif">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Resources\lava_world.gif">
+      <None Update="Resources\main.gif">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Resources\sol.gif">
+      <None Update="Resources\GameBackground.png">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Resources\terra.gif">
+      <None Update="Resources\Flower.gif">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Resources\Space_Background.png">
+      <None Update="Resources\Opps.gif">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="Resources\PlayerShoot.gif">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Resources\Dialogue\miyunguli.png" />
+      <Content Include="Resources\Dialogue\Cutscene1.png">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Resources\Dialogue\Cutscene2.png" />
+      <Content Include="Resources\Dialogue\Cutscene2.png">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
 </Project>

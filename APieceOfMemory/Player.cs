@@ -11,14 +11,40 @@ namespace APieceOfMemory
         public bool CanMoveFreely { get; set; }
 
         public RectangleF Bounds => new RectangleF(Position, Size);
+        
+        private SpriteManager currentSprite;
+        private int shootingDuration = 500; // ms
+        private DateTime? shootingStartTime = null;
+
+        public void TriggerShootAnimation()
+        {
+            if (shootingStartTime.HasValue) return; // Retrigger Deterrencee
+            shootingStartTime = DateTime.Now;
+            currentSprite = AnimatedSpriteManager.PlayerShootingSprite;
+        }
+
+        public void Update()
+        {
+            if (shootingStartTime.HasValue)
+            {
+                var elapsed = (DateTime.Now - shootingStartTime.Value).TotalMilliseconds;
+                if (elapsed >= shootingDuration)
+                {
+                    shootingStartTime = null;
+                    currentSprite = AnimatedSpriteManager.PlayerSprite;
+                }
+            }
+        }
 
         public Player(float x, float y, Image sprite, Color color, int speed)
         {
             Position = new PointF(x, y);
-            Size = new Size(sprite.Size.Width - 50, sprite.Size.Height - 50);
+            Size = new Size(sprite.Size.Width - 125, sprite.Size.Height - 125);
             Color = color;
             Speed = speed;
             CanMoveFreely = false;
+            
+            currentSprite = AnimatedSpriteManager.PlayerSprite;
         }
 
         public void Move(float dx, float dy, Rectangle clientBounds)
@@ -36,7 +62,7 @@ namespace APieceOfMemory
 
         public void Draw(Graphics g)
         {
-            Image SpriteToUse = AnimatedSpriteManager.PlayerSprite?.CurrentFrameImage;
+            Image SpriteToUse = currentSprite?.CurrentFrameImage;
             
             if (SpriteToUse != null) {
                 g.DrawImage(SpriteToUse, Bounds);

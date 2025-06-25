@@ -1,23 +1,23 @@
-﻿// GameForm.cs
+﻿
+// GameForm.cs
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D; // For SmoothingMode
+using System.Drawing.Drawing2D; // SmoothingMode
 using System.Linq;
 using System.Windows.Forms;
-using System.Diagnostics;     // For Debug.WriteLine
+using System.Diagnostics;   
 
-// Ensure GameScreenState enum is defined (e.g., at the top of this file or in a shared file)
-public enum GameScreenState { Playing, LevelTransition, GameOver }
-// (StartScreen state is handled by the separate StartScreen.cs)
+public enum GameScreenState { Playing, LevelTransition, GameOver, Dialogue }
 
 namespace APieceOfMemory
 {
     public partial class GameForm : Form
     {
-        private GameScreenState currentScreenState = GameScreenState.Playing; // GameForm starts directly into Playing
+        private GameScreenState currentScreenState = GameScreenState.Playing; 
 
-        // Core Game Objects
+        // Core Obj.
+        private int? pendingDialogueLevel = null;
         private Player player;
         private Flower flower;
         private List<Enemy> enemies;
@@ -31,7 +31,9 @@ namespace APieceOfMemory
         private System.Windows.Forms.Timer gameTimer;
         private Random random = new Random();
         private HashSet<Keys> pressedKeys = new HashSet<Keys>();
-        private string gameMessage = ""; // For "Level Complete", "Game Over" overlays
+        private string gameMessage = ""; // For "Level Complete" / "Game Over" overlays
+        private bool levelCompletionReady = false;
+
 
         // Game Parameters
         private const int PlayerSize = 30;
@@ -47,7 +49,7 @@ namespace APieceOfMemory
         private DateTime lastPlayerShootTime = DateTime.MinValue;
         private TimeSpan playerShootCooldown = TimeSpan.FromMilliseconds(300);
         private DateTime lastBossShootTime = DateTime.MinValue;
-        private TimeSpan bossShootCooldown = TimeSpan.FromSeconds(1.0); // Slightly faster regular boss shots
+        private TimeSpan bossShootCooldown = TimeSpan.FromSeconds(7.0); // Skill 1
         private DateTime lastEnemySpawnTime = DateTime.MinValue;
         private TimeSpan enemySpawnInterval;
         private DateTime lastPlayerCareActionTime = DateTime.MinValue;
@@ -67,17 +69,19 @@ namespace APieceOfMemory
         private Font objectiveFont = new Font("Segoe UI", 10F, FontStyle.Italic);
         private string temporaryFeedbackMessage = "";
         private DateTime feedbackMessageExpiry = DateTime.MinValue;
+        private bool dialogueJustEnded = false;
+        private bool levelActive = false;
 
         // Level Progress
         private int waterGoal;
         private int fertilizerGoal;
         private int waterProgress;
         private int fertilizerProgress;
-        private const float COLLECTIBLE_DROP_CHANCE = 0.40f; // 40% chance
+        private const float COLLECTIBLE_DROP_CHANCE = 0.40f; // 40% chance resource
 
-        // Debug (can be removed or adjusted for release)
+        // Debug
         public float inflation = 25f; // Moderate inflation for collection zone
-
+        
         public GameForm()
         {
             this.Text = "A Piece of Memory";
@@ -87,7 +91,7 @@ namespace APieceOfMemory
             this.StartPosition = FormStartPosition.CenterScreen;
             // this.BackColor = Color.FromArgb(15, 15, 30); // Darker blue
             this.DoubleBuffered = true;
-            this.BackgroundImage = Image.FromFile(Path.Combine(Application.StartupPath, "Resources", "Space_Background.png"));
+            this.BackgroundImage = Image.FromFile(Path.Combine(Application.StartupPath, "Resources", "GameBackground.png"));
             this.BackgroundImageLayout = ImageLayout.Center;
 
             this.Paint += GameForm_Paint;
@@ -102,9 +106,8 @@ namespace APieceOfMemory
         private void InitializeAndStartGame() 
         {
             currentScreenState = GameScreenState.Playing;
-            currentLevel = 1;    
-            
-            StartGameplayLevel(currentLevel); 
+            currentLevel = 1;  
+            pendingDialogueLevel = 1;
 
             if (gameTimer == null)
             {
@@ -118,14 +121,16 @@ namespace APieceOfMemory
             }
         }
         
-        private void StartGameplayLevel(int levelNumber)
+        private void ShowDialogueForLevel(int levelNumber)
         {
             currentLevel = levelNumber;
             currentScreenState = GameScreenState.Playing;
-
+            
+            ShowDialogueImageForLevel(currentLevel);
+            
             // player = new Player(this.ClientSize.Width / 2f - PlayerSize / 2f, this.ClientSize.Height - PlayerSize - 50, PlayerSize, Color.Cyan, PlayerSpeed);
             player = new Player(this.ClientSize.Width / 2f - PlayerSize / 2f, this.ClientSize.Height - PlayerSize - 50, AnimatedSpriteManager.PlayerSprite?.CurrentFrameImage, Color.Cyan, PlayerSpeed);
-            flower = new Flower(30, this.ClientSize.Height / 2f - FlowerPotSize / 2f, FlowerPotSize); // Flower resets each level start
+            flower = new Flower(30, this.ClientSize.Height / 2f - FlowerPotSize / 2f, FlowerPotSize); // Flower reset
             
             enemies = new List<Enemy>();
             playerProjectiles = new List<Projectile>();
@@ -141,6 +146,45 @@ namespace APieceOfMemory
             pressedKeys.Clear();
 
             SetupLevelSpecifics(currentLevel); 
+        }
+        
+        private void ShowDialogueImageForLevel(int level)
+        {
+            string imagePath = Path.Combine(Application.StartupPath, "Resources", "Dialogue", $"Cutscene{level}.png");
+            if (File.Exists(imagePath))
+            {
+                Form imageForm = new Form();
+                imageForm.FormBorderStyle = FormBorderStyle.None;
+                imageForm.StartPosition = FormStartPosition.CenterScreen;
+                imageForm.BackColor = Color.Black;
+                imageForm.Width = 800;
+                imageForm.Height = 600;
+                imageForm.TopMost = true;
+
+                PictureBox pb = new PictureBox
+                {
+                    Image = Image.FromFile(imagePath),
+                    SizeMode = PictureBoxSizeMode.StretchImage,
+                    Dock = DockStyle.Fill
+                };
+                imageForm.Controls.Add(pb);
+
+                Label prompt = new Label
+                {
+                    Text = "Press any key to continue...",
+                    ForeColor = Color.White,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                    Dock = DockStyle.Bottom,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Height = 40
+                };
+                imageForm.Controls.Add(prompt);
+
+                imageForm.KeyDown += (s, e) => imageForm.Close();
+                pb.Click += (s, e) => imageForm.Close();
+                imageForm.ShowDialog();
+            }
         }
 
         private void SetupLevelSpecifics(int level)
@@ -227,6 +271,30 @@ namespace APieceOfMemory
         
         private void GameTimer_Tick(object sender, EventArgs e)
         {
+            if (dialogueJustEnded)
+            {
+                dialogueJustEnded = false;
+                return;
+            }
+            
+            if (pendingDialogueLevel.HasValue)
+            {
+                int levelToStart = pendingDialogueLevel.Value;
+                pendingDialogueLevel = null;
+                
+                currentScreenState = GameScreenState.Dialogue;
+
+                // Cutscene-tick handler
+                ShowDialogueImageForLevel(levelToStart); 
+                ShowDialogueForLevel(levelToStart);  
+                
+                levelCompletionReady = false;
+                levelActive = true;
+                Task.Delay(1000).ContinueWith(_ => levelCompletionReady = true);
+                currentScreenState = GameScreenState.Playing;
+                return; 
+            }
+            
             switch (currentScreenState)
             {
                 case GameScreenState.Playing:
@@ -239,7 +307,9 @@ namespace APieceOfMemory
         private void UpdateGame()
         {
             if (currentScreenState != GameScreenState.Playing) return;
-
+            
+            if (player == null || flower == null) return;
+            player.Update();
             // Player Movement
             float dx = 0; float dy = 0;
             if (!(currentLevel >= 1 && currentLevel <= 4)) 
@@ -288,7 +358,7 @@ namespace APieceOfMemory
                 enemies[i].Update(targetPos); 
                 if (enemies[i].Bounds.IntersectsWith(flower.Bounds)) {
                     flower.TakeDamage(); enemies.RemoveAt(i);
-                    if (flower.State == FlowerState.Dead) { HandleGameOver("The memory faded... The flower is gone."); return;}
+                    if (flower.State == FlowerState.Dead) { HandleGameOver("The memory faded... The flower is gone."); levelActive = false; return;}
                 } else if (enemies[i].Position.X < -enemies[i].Size.Width * 1.5f || enemies[i].Position.X > this.ClientSize.Width + enemies[i].Size.Width * 1.5f) {
                     enemies.RemoveAt(i);
                 }
@@ -359,6 +429,7 @@ namespace APieceOfMemory
                         float dirX = e.X - playerCenter.X; float dirY = e.Y - playerCenter.Y; float length = (float)Math.Sqrt(dirX * dirX + dirY * dirY);
                         if (length > 0) {
                             float normX = dirX/length; float normY = dirY/length;
+                            player.TriggerShootAnimation();
                             playerProjectiles.Add(new Projectile( playerCenter.X + normX * (player.Size.Width/2f + 3) - ProjectileSize/2f, playerCenter.Y + normY * (player.Size.Height/2f + 3) - ProjectileSize/2f, ProjectileSize, Color.LightSkyBlue, new PointF(normX * PlayerProjectileSpeed, normY * PlayerProjectileSpeed), ProjectileType.Player));
                             lastPlayerShootTime = DateTime.Now;
                         }
@@ -457,7 +528,8 @@ namespace APieceOfMemory
                 case 5: if (boss == null) conditionsMet = true; break;
                 // case 6: if (enemies.Count == 0 && !AnyEnemiesSpawningSoon() && flower.State != FlowerState.Dead) { /* conditionsMet = true; */ } break;
             }
-            if (conditionsMet) { currentScreenState = GameScreenState.LevelTransition; gameMessage = $"Level {currentLevel} Complete!"; temporaryFeedbackMessage = ""; }
+
+            if (levelActive && conditionsMet && levelCompletionReady) {levelCompletionReady = false; levelActive = false; currentScreenState = GameScreenState.LevelTransition; gameMessage = $"Level {currentLevel} Complete!"; temporaryFeedbackMessage = ""; }
         }
 
         private bool AnyEnemiesSpawningSoon()
@@ -528,7 +600,7 @@ namespace APieceOfMemory
             else if (currentScreenState == GameScreenState.GameOver) prompt = "Press Enter to Return to Start Screen or Escape to Quit.";
             if (!string.IsNullOrEmpty(prompt)) { Rectangle rectPrompt = new Rectangle(0, (int)(rectMessage.Bottom - 70), ClientSize.Width, 60); TextRenderer.DrawText(g, prompt, gameFont, rectPrompt, Color.LightYellow, flags); }
         }
-
+        
         private void GameForm_Paint(object sender, PaintEventArgs e) {
             Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; 
             // g.Clear(this.BackColor); 
@@ -552,14 +624,20 @@ namespace APieceOfMemory
                     //     }
                     // }
                     // if (currentLevel == 6 && e.KeyCode == Keys.S) { MessageBox.Show("Screenshot 'saved'! (Placeholder)", "A Piece of Memory", MessageBoxButtons.OK, MessageBoxIcon.Information); }
-                    if (e.KeyCode == Keys.Q) { currentLevel++; if (currentLevel > 6) { HandleGameOver("DEBUG: All levels skipped."); } else { StartGameplayLevel(currentLevel); } }
+                    if (e.KeyCode == Keys.Q) { currentLevel++; if (currentLevel > 6) { HandleGameOver("DEBUG: All levels skipped."); } else { ShowDialogueForLevel(currentLevel); } }
                     break;
                 case GameScreenState.LevelTransition:
                     if (e.KeyCode == Keys.Enter) {
                         currentLevel++;
-                        if (currentLevel > 5) { HandleGameOver("You've pieced together all the memories.\nThank you for playing."); }
-                        else { StartGameplayLevel(currentLevel); }
+                        if (currentLevel > 5) {
+                            HandleGameOver("You've pieced together all the memories.\nThank you for playing.");
+                        } else {
+                            pendingDialogueLevel = currentLevel;   //Dialogue presskey handler
+                        }
                     }
+                    break;
+                case GameScreenState.Dialogue:
+                    //Dialogue Override
                     break;
                 case GameScreenState.GameOver:
                     if (e.KeyCode == Keys.Enter) { InitializeAndStartGame(); }
