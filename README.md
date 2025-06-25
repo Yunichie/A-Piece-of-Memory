@@ -24,7 +24,7 @@ Dalam dunia di mana krisis lingkungan semakin parah, game ini hadir sebagai medi
 5. **Sebagai pemain**, saya ingin mendapat pengalaman yang menyenangkan sambil belajar tentang lingkungan agar pendidikan lingkungan terasa menarik
 
 ## 👀 Diagram Class
-![Class Diagram](APieceOfMemory Diagram Class.png)
+![Class Diagram](APieceOfMemory%20Diagram%20Class.png)
 
 ## 🏗️ Arsitektur Sistem
 
