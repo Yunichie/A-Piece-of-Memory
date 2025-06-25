@@ -1,6 +1,4 @@
-﻿using System.Drawing;
-
-namespace APieceOfMemory
+﻿namespace APieceOfMemory
 {
     public enum EnemyType { Slow, Fast, Faster }
 

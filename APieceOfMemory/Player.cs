@@ -1,6 +1,4 @@
-﻿using System.Drawing;
-
-namespace APieceOfMemory
+﻿namespace APieceOfMemory
 {
     public class Player
     {
@@ -18,7 +16,8 @@ namespace APieceOfMemory
 
         public void TriggerShootAnimation()
         {
-            if (shootingStartTime.HasValue) return; // Retrigger Deterrencee
+            if (shootingStartTime.HasValue) return;
+            
             shootingStartTime = DateTime.Now;
             currentSprite = AnimatedSpriteManager.PlayerShootingSprite;
         }
@@ -28,6 +27,7 @@ namespace APieceOfMemory
             if (shootingStartTime.HasValue)
             {
                 var elapsed = (DateTime.Now - shootingStartTime.Value).TotalMilliseconds;
+                
                 if (elapsed >= shootingDuration)
                 {
                     shootingStartTime = null;
@@ -64,9 +64,12 @@ namespace APieceOfMemory
         {
             Image SpriteToUse = currentSprite?.CurrentFrameImage;
             
-            if (SpriteToUse != null) {
+            if (SpriteToUse != null) 
+            {
                 g.DrawImage(SpriteToUse, Bounds);
-            } else {
+            } 
+            else 
+            {
                 using (SolidBrush brush = new SolidBrush(Color))
                 {
                     g.FillEllipse(brush, Bounds);

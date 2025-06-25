@@ -1,7 +1,4 @@
-﻿using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+﻿using System.Drawing.Drawing2D;
 
 namespace APieceOfMemory 
 {
@@ -162,6 +159,7 @@ namespace APieceOfMemory
         {
             AnimatedSpriteManager.DisposeSprites();
             base.OnFormClosed(e);
+            
             if (Application.OpenForms.Count == 0)
             {
                 Application.Exit();

@@ -1,7 +1,4 @@
-﻿using System; // Required for DateTime and TimeSpan
-using System.Drawing;
-
-namespace APieceOfMemory
+﻿namespace APieceOfMemory
 {
     public enum CollectibleType
     {
@@ -22,10 +19,6 @@ namespace APieceOfMemory
         private static readonly TimeSpan Lifespan = TimeSpan.FromSeconds(7);
 
         public static readonly int DefaultSize = 18;
-
-        // Sprite placeholder:
-        public Image WaterSprite { get; set; }
-        public Image FertilizerSprite { get; set; }
 
         public Collectible(float x, float y, CollectibleType type)
         {
@@ -66,7 +59,8 @@ namespace APieceOfMemory
             {
                 if (Type == CollectibleType.Water)
                 {
-                    PointF[] dropletPoints = {
+                    PointF[] dropletPoints = 
+                    {
                         new PointF(Position.X + Size.Width / 2f, Position.Y),
                         new PointF(Position.X + Size.Width, Position.Y + Size.Height * 0.7f),
                         new PointF(Position.X + Size.Width / 2f, Position.Y + Size.Height),

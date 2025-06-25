@@ -1,6 +1,4 @@
-﻿using System.Drawing;
-
-namespace APieceOfMemory
+﻿namespace APieceOfMemory
 {
     public enum FlowerState { Healthy, Damaged, Broken, Dead }
 
@@ -34,6 +32,7 @@ namespace APieceOfMemory
         public void Draw(Graphics g)
         {
             Image spriteToDraw = null;
+            
             switch (State)
             {
                 case FlowerState.Healthy: spriteToDraw = AnimatedSpriteManager.FlowerSprite?.CurrentFrameImage; break;
@@ -41,9 +40,13 @@ namespace APieceOfMemory
                 case FlowerState.Broken: spriteToDraw = AnimatedSpriteManager.FlowerSprite?.CurrentFrameImage; break;
                 case FlowerState.Dead: spriteToDraw = AnimatedSpriteManager.FlowerSprite?.CurrentFrameImage; break;
             }
-            if (spriteToDraw != null) {
+            
+            if (spriteToDraw != null) 
+            {
                 g.DrawImage(spriteToDraw, Bounds);
-            } else {
+            } 
+            else 
+            {
             using (SolidBrush brush = new SolidBrush(GetCurrentColor()))
                 {
                     float stemWidth = Size.Width / 5f;

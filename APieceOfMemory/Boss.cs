@@ -1,7 +1,4 @@
-﻿using System;
-using System.Drawing;
-
-namespace APieceOfMemory
+﻿namespace APieceOfMemory
 {
     public class Boss
     {
@@ -40,6 +37,7 @@ namespace APieceOfMemory
 
             this.verticalTargetY = y;
             this.verticalMoveSpeed = BaseSpeed * 0.5f; 
+            
             SetNewVerticalTarget(); 
         }
 
@@ -53,6 +51,7 @@ namespace APieceOfMemory
             if (!hasEntered)
             {
                 Position = new PointF(Position.X - BaseSpeed, Position.Y);
+                
                 if (Position.X <= entryTargetX)
                 {
                     Position = new PointF(entryTargetX, Position.Y); // Snap to final X position
