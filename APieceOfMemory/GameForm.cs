@@ -490,6 +490,7 @@ namespace APieceOfMemory
                         if (length > 0) 
                         {
                             float normX = dirX/length; float normY = dirY/length;
+                            player.TriggerShootAnimation();
                             
                             playerProjectiles.Add(new Projectile( playerCenter.X + normX * (player.Size.Width/2f + 3) - ProjectileSize/2f, playerCenter.Y + normY * (player.Size.Height/2f + 3) - ProjectileSize/2f, ProjectileSize, Color.LightSkyBlue, new PointF(normX * PlayerProjectileSpeed, normY * PlayerProjectileSpeed), ProjectileType.Player));
                             lastPlayerShootTime = DateTime.Now;
