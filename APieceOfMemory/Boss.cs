@@ -22,7 +22,7 @@
         public Boss(float x, float y, int size, Color color, float speed, int health, float clientWidth, float clientHeight)
         {
             Position = new PointF(x, y); 
-            Size = new Size(size, size);
+            Size = new Size(size * 2, size * 2);
             Color = color;
             BaseSpeed = speed; 
             MaxHealth = health;

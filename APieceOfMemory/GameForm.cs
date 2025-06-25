@@ -44,7 +44,7 @@ namespace APieceOfMemory
         private DateTime lastPlayerShootTime = DateTime.MinValue;
         private TimeSpan playerShootCooldown = TimeSpan.FromMilliseconds(300);
         private DateTime lastBossShootTime = DateTime.MinValue;
-        private TimeSpan bossShootCooldown = TimeSpan.FromSeconds(1.0);
+        private TimeSpan bossShootCooldown = TimeSpan.FromSeconds(7.0);
         private DateTime lastEnemySpawnTime = DateTime.MinValue;
         private TimeSpan enemySpawnInterval;
         private DateTime lastPlayerCareActionTime = DateTime.MinValue;
@@ -289,7 +289,9 @@ namespace APieceOfMemory
         private void UpdateGame()
         {
             if (currentScreenState != GameScreenState.Playing) return;
-
+            
+            player.Update();
+            
             // Player Movement
             float dx = 0; 
             float dy = 0;
@@ -701,7 +703,7 @@ namespace APieceOfMemory
             // Debug drawing for collection zone
             if (currentLevel >= 1 && currentLevel <= 4 && currentScreenState == GameScreenState.Playing) 
             {
-                using (Pen playerPen = new Pen(Color.FromArgb(100, Color.LightGreen), 1)) 
+                using (Pen playerPen = new Pen(Color.FromArgb(0, Color.LightGreen), 1)) 
                 {
                     if (player != null) g.DrawRectangle(playerPen, Rectangle.Round(player.Bounds));
                 }
